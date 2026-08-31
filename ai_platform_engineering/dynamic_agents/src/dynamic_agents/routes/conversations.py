@@ -103,26 +103,37 @@ async def get_interrupt_state(
     # 4. Get MCP servers for the agent and its subagents (needed to create runtime)
     mcp_servers = mongo.get_agent_mcp_servers(agent)
 
-    # 5. Get or create runtime to access checkpointer
+    # 5. Create a non-cached Mongo-backed runtime to access the checkpointer.
+    #
+    # This is a read-only probe: it only needs the durable LangGraph
+    # checkpoint to answer "is there a pending interrupt?". Routing it
+    # through the shared runtime cache (get_or_create) would key a runtime
+    # for this conversation_id and leave it cached for reuse. If MCP server
+    # initialization degrades or fails closed at probe time — e.g. a
+    # transient connection error, or credentials not yet available in this
+    # request's context — the next real chat call on the same conversation
+    # reuses that degraded, cached runtime instead of getting a fresh one.
+    # A persistent one-shot runtime still reads the same checkpoint but is
+    # cleaned up immediately after this request and can never be reused by
+    # a later chat call.
     cache = get_runtime_cache()
     cache.set_mongo_service(mongo)
 
-    runtime = await cache.get_or_create(
+    async with cache.persistent(
         agent,
         mcp_servers,
         conversation_id,
         user=user,
-    )
+    ) as runtime:
+        # 6. Check for pending interrupt only (no message extraction)
+        if not runtime._graph:
+            return InterruptStateResponse(
+                conversation_id=conversation_id,
+                agent_id=agent_id,
+                has_pending_interrupt=False,
+            )
 
-    # 6. Check for pending interrupt only (no message extraction)
-    if not runtime._graph:
-        return InterruptStateResponse(
-            conversation_id=conversation_id,
-            agent_id=agent_id,
-            has_pending_interrupt=False,
-        )
-
-    interrupt_data = await runtime.has_pending_interrupt(conversation_id)
+        interrupt_data = await runtime.has_pending_interrupt(conversation_id)
     has_pending_interrupt = interrupt_data is not None
 
     logger.debug(
