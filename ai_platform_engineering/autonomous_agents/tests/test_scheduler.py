@@ -25,6 +25,7 @@ from autonomous_agents.models import (
 from autonomous_agents.services.chat_history import (
     conversation_id_for_task,
     conversation_id_for_webhook_run,
+    execution_context_id_for_task_run,
 )
 from autonomous_agents.services.scheduler import (
     get_scheduler,
@@ -419,6 +420,48 @@ class TestChatHistoryPublisher:
         persisted = (await store.list_all())[0]
         assert persisted.conversation_id == run.conversation_id
 
+    @pytest.mark.parametrize(
+        "trigger",
+        [CronTrigger(schedule="0 9 * * *"), IntervalTrigger(minutes=30)],
+        ids=["cron", "interval"],
+    )
+    async def test_scheduled_runs_share_visible_chat_but_not_execution_context(
+        self,
+        store: _DictRunStore,
+        publisher: _RecordingPublisher,
+        trigger,
+    ):
+        """Each scheduled fire starts clean while results stay in one task chat."""
+        scheduled_task = TaskDefinition(
+            id="isolated-scheduled-task",
+            name="Isolated scheduled task",
+            dynamic_agent_id="agent-x",
+            prompt="check status",
+            trigger=trigger,
+        )
+        invoke = AsyncMock(return_value=("ok", []))
+        with patch(
+            "autonomous_agents.services.task_runner.invoke_dynamic_agent_streaming",
+            new=invoke,
+        ):
+            first = await execute_task(scheduled_task, run_id="scheduled-run-1")
+            second = await execute_task(scheduled_task, run_id="scheduled-run-2")
+
+        visible_chat_id = conversation_id_for_task(scheduled_task.id)
+        assert first.conversation_id == visible_chat_id
+        assert second.conversation_id == visible_chat_id
+        assert first.execution_context_id == execution_context_id_for_task_run(
+            scheduled_task.id, "scheduled-run-1"
+        )
+        assert second.execution_context_id == execution_context_id_for_task_run(
+            scheduled_task.id, "scheduled-run-2"
+        )
+        assert first.execution_context_id != second.execution_context_id
+        assert [call.kwargs["conversation_id"] for call in invoke.await_args_list] == [
+            first.execution_context_id,
+            second.execution_context_id,
+        ]
+
     async def test_webhook_context_is_redacted_in_published_prompt_by_default(
         self, store: _DictRunStore, publisher: _RecordingPublisher, cron_task: TaskDefinition,
     ):
@@ -530,20 +573,22 @@ class TestChatHistoryPublisher:
         assert run.status == TaskStatus.SUCCESS
         assert run.conversation_id is None
 
-    async def test_disabled_publisher_keeps_internal_dynamic_agent_conversation_id(
+    async def test_disabled_publisher_keeps_per_run_execution_context(
         self, store: _DictRunStore, cron_task: TaskDefinition,
     ):
-        """The runtime context id remains stable even when no UI chat is published."""
+        """A fresh runtime context remains available when UI publishing is off."""
         invoke = AsyncMock(return_value=("ok", []))
         with patch(
             "autonomous_agents.services.task_runner.invoke_dynamic_agent_streaming",
             new=invoke,
         ):
-            await execute_task(cron_task)
+            run = await execute_task(cron_task, run_id="unpublished-run")
 
-        assert invoke.await_args.kwargs["conversation_id"] == conversation_id_for_task(
-            cron_task.id
+        assert run.conversation_id is None
+        assert run.execution_context_id == execution_context_id_for_task_run(
+            cron_task.id, "unpublished-run"
         )
+        assert invoke.await_args.kwargs["conversation_id"] == run.execution_context_id
 
 
 class TestFollowUp:

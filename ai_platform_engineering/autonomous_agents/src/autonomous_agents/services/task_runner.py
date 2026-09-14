@@ -33,6 +33,7 @@ from autonomous_agents.services.chat_history import (
     NoopChatHistoryPublisher,
     conversation_id_for_task,
     conversation_id_for_webhook_run,
+    execution_context_id_for_task_run,
 )
 from autonomous_agents.services.dynamic_agents_client import (
     DynamicAgentsAuthorizationRevokedError,
@@ -338,11 +339,14 @@ async def execute_task(
                 )
                 execution_context_id = conversation_id_for_task(task.id)
     else:
-        # Scheduled tasks intentionally keep one continuing context per task.
-        execution_context_id = conversation_id_for_task(task.id)
+        # Cron, interval, and manual fires each start with clean model state.
+        # Their results still append to one stable UI conversation below.
+        execution_context_id = execution_context_id_for_task_run(task.id, run_id)
 
     publish_to_chat = task_chat_history_publishing_enabled(task)
-    published_conversation_id = execution_context_id if publish_to_chat else None
+    published_conversation_id = (
+        conversation_id_for_task(task.id) if publish_to_chat else None
+    )
     # Materialise the prompt the agent will actually see. For follow-up
     # runs we splice the operator reply into a clearly-labelled section
     # so the LLM treats it as new instructions rather than confusing it

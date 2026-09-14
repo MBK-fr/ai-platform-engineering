@@ -257,10 +257,10 @@ async def invoke_dynamic_agent(
     Args:
         prompt: The task prompt -- becomes the ``message`` field on the
             dynamic-agents ``ChatRequest``.
-        task_id: Stable autonomous task id; used to derive a deterministic
-            conversation id when ``conversation_id`` is not supplied so
-            scheduled runs of the same task share session state with the
-            interactive chat thread for that task.
+        task_id: Stable autonomous task id; used only as a compatibility
+            fallback to derive a deterministic conversation id when
+            ``conversation_id`` is not supplied. The task runner supplies an
+            explicit per-run execution context.
         agent_id: Dynamic-agents service agent id (``ChatRequest.agent_id``).
         conversation_id: Optional explicit conversation id (UUID5-derived
             elsewhere). When ``None``, derived from ``task_id``.
