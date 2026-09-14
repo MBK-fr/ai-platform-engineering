@@ -21,9 +21,8 @@ description: "Create an rc/hotfix tag on a release/* branch and trigger a coordi
 #   5. Explicitly dispatches ci-helm.yml with force_build=true so the Helm
 #      chart is published even when no chart files changed in this commit.
 #
-# To force-rebuild every container image fresh (bypass retag for unchanged
-# components), run each ci-*.yml individually via workflow_dispatch with
-# force_build=true after this workflow has created the tag.
+# The push-tag event already rebuilds every container image fresh (tag
+# pushes are never skipped or retagged from a prior version).
 
 on:
   workflow_dispatch:
@@ -57,7 +56,7 @@ jobs:
 
     steps:
       - name: 🔒 Harden runner
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit
 
@@ -158,7 +157,7 @@ jobs:
       - name: 🐍 Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: '3.13'
+          python-version: '3.14'
 
       - name: 📦 Install uv
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
@@ -266,10 +265,6 @@ jobs:
           - \`ci-mcp-sub-agent\`
           - \`ci-rag\`
           - \`ci-helm\` (also dispatched explicitly with \`force_build=true\`)
-
-          > To force-rebuild every image fresh (bypass retag for unchanged components),
-          > run each \`ci-*.yml\` manually via **workflow_dispatch** with
-          > \`force_build=true\` and \`tag_version=${RC_TAG}\` after this workflow completes.
           EOF
 
   dispatch-helm:
@@ -282,7 +277,7 @@ jobs:
 
     steps:
       - name: 🔒 Harden runner
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit
 
