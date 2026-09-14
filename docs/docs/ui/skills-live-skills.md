@@ -6,8 +6,8 @@ title: Live-skills (`/skills` slash command)
 # Live-skills (`/skills` slash command)
 
 The **Skills Gateway** page (UI → *Skills* → *Skills Gateway*) renders
-a copy-pasteable skill that lets a coding agent (Claude Code, Cursor, Codex
-CLI, Gemini CLI, or opencode) browse, search, run, install, and update skills served by the
+a copy-pasteable slash command that lets a coding agent (Claude Code, Cursor,
+Spec Kit, etc.) browse, search, run, install, and update skills served by the
 CAIPE skill catalog.
 
 The body of that slash command is rendered from a single Markdown template
@@ -19,7 +19,7 @@ image.
 
 | Layer            | Location                                                         |
 | ---------------- | ---------------------------------------------------------------- |
-| Packaged default | [`charts/ai-platform-engineering/data/skills/live-skills.md`](https://github.com/cnoe-io/ai-platform-engineering/tree/main/charts/ai-platform-engineering/data/skills/live-skills.md) |
+| Packaged default | [`charts/ai-platform-engineering/data/skills/live-skills.md`](https://github.com/caipe-io/ai-platform-engineering/tree/main/charts/ai-platform-engineering/data/skills/live-skills.md) |
 | Helm ConfigMap   | `skills-live-skills` (key `live-skills.md`)                          |
 | Mounted in pod   | `/app/data/skills-live-skills/live-skills.md` on the `caipe-ui` pod  |
 | Served at        | `GET /api/skills/live-skills` (returns `{ template, source, … }`)  |
@@ -37,7 +37,8 @@ on the page:
 
 `{{ARG_REF}}` is substituted **per agent** by the renderer (see
 [Multi-agent support](#multi-agent-support) below) so the same canonical
-template produces a consistent `$ARGUMENTS` reference for each surface.
+template produces the right `$ARGUMENTS` (Claude/Cursor/Spec Kit), `$1`
+(Codex/Gemini), or `{{input}}` (Continue) reference for each surface.
 
 ## Override resolution order
 
@@ -154,10 +155,11 @@ Once the template is in place, the **Skills Gateway** page lets the user:
 
 - Pick a **slash command name** (`skills` by default).
 - Pick a **description** (rendered into the artifact's frontmatter / metadata).
-- Pick a **coding agent** (Claude Code, Cursor, Codex CLI, Gemini CLI, or
-  opencode) &mdash; the install path and launch guidance
+- Pick a **coding agent** (Claude Code, Cursor, Spec Kit, Codex CLI, Gemini
+  CLI, Continue) &mdash; the install path, file format, and argument syntax
   are derived from this choice.
-- Copy the generated install command for the shared `SKILL.md` artifact.
+- Copy the generated install command (`mkdir -p … && cat > … << 'SKILL' …`)
+  or, for Continue, the JSON fragment to merge into `~/.continue/config.json`.
 - Preview the rendered artifact (Markdown / TOML / JSON).
 - Read the per-agent **launch & invocation guide** rendered just below the
   install command.
@@ -169,20 +171,21 @@ ConfigMap serves every surface without operators maintaining N copies.
 
 `GET /api/skills/live-skills?agent=<id>&command_name=<name>&description=<desc>`
 returns a per-agent rendered artifact plus install/launch metadata. The
-agent registry currently ships with five entries:
+agent registry currently ships with six entries:
 
-| Agent ID  | Label              | Install path | Format |
-|-----------|--------------------|--------------|--------|
-| `claude`  | Claude Code        | `.claude/skills/{name}/SKILL.md` plus `.agents/skills/{name}/SKILL.md` | agentskills.io Markdown |
-| `cursor`  | Cursor             | `.agents/skills/{name}/SKILL.md` | agentskills.io Markdown |
-| `codex`   | Codex CLI (OpenAI) | `.agents/skills/{name}/SKILL.md` | agentskills.io Markdown |
-| `gemini`  | Gemini CLI         | `.agents/skills/{name}/SKILL.md` | agentskills.io Markdown |
-| `opencode`| opencode           | `.agents/skills/{name}/SKILL.md` | agentskills.io Markdown |
+| Agent ID    | Label                          | Install path                                    | Format                    | Argument syntax |
+| ----------- | ------------------------------ | ----------------------------------------------- | ------------------------- | --------------- |
+| `claude`    | Claude Code                    | `.claude/commands/{name}.md`                    | Markdown + frontmatter    | `$ARGUMENTS`    |
+| `cursor`    | Cursor                         | `.cursor/commands/{name}.md`                    | Markdown + frontmatter    | `$ARGUMENTS`    |
+| `codex`     | Codex CLI (OpenAI)             | `~/.codex/prompts/{name}.md`                    | Plain Markdown            | `$1`            |
+| `gemini`    | Gemini CLI                     | `~/.gemini/commands/{name}.toml`                | TOML (`description`, `prompt`) | `$1`       |
+| `continue`  | Continue (VS Code / JetBrains) | `~/.continue/config.json` (fragment to merge)   | JSON fragment             | `{{input}}`     |
 
 The renderer parses the canonical Markdown's frontmatter once, substitutes
 `{{COMMAND_NAME}}`, `{{DESCRIPTION}}`, `{{BASE_URL}}`, and `{{ARG_REF}}`,
-then emits the shared `SKILL.md` format. Adding a new agent is one entry in
-[`ui/src/app/api/skills/live-skills/agents.ts`](https://github.com/cnoe-io/ai-platform-engineering/tree/main/ui/src/app/api/skills/live-skills/agents.ts)
+then re-wraps the body as appropriate for each surface (YAML frontmatter,
+TOML basic strings, or a JSON object). Adding a new agent is one entry in
+[`ui/src/app/api/skills/live-skills/agents.ts`](https://github.com/caipe-io/ai-platform-engineering/tree/main/ui/src/app/api/skills/live-skills/agents.ts)
 plus a case in `renderForAgent()`.
 
 ### Per-agent launch & invocation guidance
@@ -194,14 +197,25 @@ basic Markdown (bold, inline code, links, fenced code blocks).
 
 #### Quick reference
 
-- **Claude Code** installs a native copy under `.claude/skills/` and a shared
-  copy under `.agents/skills/`.
-- **Cursor**, **Codex CLI**, **Gemini CLI**, and **opencode** discover the
-  shared `.agents/skills/` tree. Relaunch or reload the tool after installing a
-  new skill if it does not appear immediately.
+- **Claude Code** &mdash; `npm install -g @anthropic-ai/claude-code` →
+  `claude` from your repo root → `/skills`. Auto-discovers commands in
+  `.claude/commands/` (per-repo) and `~/.claude/commands/` (user-global).
+- **Cursor** &mdash; install from [cursor.com](https://cursor.com), open the
+  repo, then `Cmd/Ctrl + L` → `/skills`. Reload the window if a new command
+  doesn't appear in the picker.
+- **Codex CLI** &mdash; `npm install -g @openai/codex` → `codex` →
+  `/skills`. Prompts live in `~/.codex/prompts/` (user-global). Use
+  `$1`-style positional args when invoking the prompt.
+- **Gemini CLI** &mdash; `npm install -g @google/gemini-cli` → `gemini`
+  from your repo root → `/skills "kubernetes"` (quote multi-word args).
+  Commands live in `~/.gemini/commands/` (user-global) or
+  `.gemini/commands/` (per-repo).
+- **Continue** &mdash; install the VS Code or JetBrains extension, then
+  merge the rendered JSON fragment into the top-level `slashCommands` array
+  of `~/.continue/config.json`. Continue reloads `config.json` automatically.
 
 ## See also
 
-- Chart-side reference: [`charts/ai-platform-engineering/docs/skills-live-skills.md`](https://github.com/cnoe-io/ai-platform-engineering/tree/main/charts/ai-platform-engineering/docs/skills-live-skills.md)
-- Default template: [`live-skills.md`](https://github.com/cnoe-io/ai-platform-engineering/tree/main/charts/ai-platform-engineering/data/skills/live-skills.md)
-- ConfigMap template: [`templates/skills-live-skills-config.yaml`](https://github.com/cnoe-io/ai-platform-engineering/tree/main/charts/ai-platform-engineering/templates/skills-live-skills-config.yaml)
+- Chart-side reference: [`charts/ai-platform-engineering/docs/skills-live-skills.md`](https://github.com/caipe-io/ai-platform-engineering/tree/main/charts/ai-platform-engineering/docs/skills-live-skills.md)
+- Default template: [`live-skills.md`](https://github.com/caipe-io/ai-platform-engineering/tree/main/charts/ai-platform-engineering/data/skills/live-skills.md)
+- ConfigMap template: [`templates/skills-live-skills-config.yaml`](https://github.com/caipe-io/ai-platform-engineering/tree/main/charts/ai-platform-engineering/templates/skills-live-skills-config.yaml)

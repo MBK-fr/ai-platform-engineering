@@ -199,6 +199,17 @@ const sidebars: SidebarsConfig = {
         { type: 'doc', id: 'repo-ops/issue-triage', label: 'Issue Triage Dashboard' },
         {
           type: 'category',
+          label: 'Advanced',
+          items: [
+            {
+              type: 'doc',
+              id: 'development/advanced/ci-infrastructure',
+              label: 'CI Infrastructure',
+            },
+          ],
+        },
+        {
+          type: 'category',
           label: 'Skills',
           items: [
             { type: 'doc', id: 'repo-ops/skills/index', label: 'Overview' },
@@ -234,8 +245,10 @@ const sidebars: SidebarsConfig = {
       type: 'category',
       label: 'Features',
       items: [
-        { type: 'doc', id: 'features/custom-agents', label: 'Custom Agents' },
+        { type: 'doc', id: 'features/index', label: 'Overview' },
+        { type: 'doc', id: 'features/agent-builder', label: 'Agent Builder' },
         { type: 'doc', id: 'features/workflows', label: 'Workflows' },
+        { type: 'doc', id: 'features/agentic-apps', label: 'External Apps' },
         {
           type: 'category',
           label: 'Rich Web UI',
@@ -246,6 +259,7 @@ const sidebars: SidebarsConfig = {
             { type: 'doc', id: 'ui/configuration', label: 'Configuration' },
             { type: 'doc', id: 'ui/customization', label: 'Customization & Branding' },
             { type: 'doc', id: 'ui/development', label: 'Development Guide' },
+            { type: 'doc', id: 'ui/selection-controls', label: 'Selection Controls' },
             { type: 'doc', id: 'ui/api-reference', label: 'API Reference' },
             { type: 'doc', id: 'ui/troubleshooting', label: 'Troubleshooting' },
           ],
@@ -303,7 +317,6 @@ const sidebars: SidebarsConfig = {
                 { type: 'doc', id: 'security/rbac/roles-scopes-comparison', label: 'Roles vs Scopes' },
                 { type: 'doc', id: 'security/rbac/helm-install-upgrade', label: 'Helm Install and Upgrade' },
                 { type: 'doc', id: 'security/rbac/caipe-rbac-migration', label: 'CAIPE RBAC Migration' },
-                { type: 'doc', id: 'security/rbac/canonical-team-membership-migration', label: 'Team Membership Migration' },
                 { type: 'doc', id: 'security/rbac/audit-log-performance', label: 'Audit Log Performance' },
                 { type: 'doc', id: 'security/rbac/secrets-bootstrap', label: 'Secrets Bootstrap' },
                 { type: 'doc', id: 'security/rbac/agent-context-hmac', label: 'Agent Context HMAC' },
@@ -364,43 +377,6 @@ const sidebars: SidebarsConfig = {
       id: 'contributing/index',
       label: 'Contributing',
     },
-    {
-      type: 'category',
-      label: 'CAIPE Labs',
-      items: [
-        {
-          type: 'doc',
-          id: 'workshop/caipeintro',
-          label: 'Introduction to CAIPE',
-        },
-        {
-          type: 'doc',
-          id: 'workshop/agent',
-          label: 'Introduction to AI Agents',
-        },
-        {
-          type: 'doc',
-          id: 'workshop/mas',
-          label: 'Multi-Agent System',
-        },
-        {
-          type: 'doc',
-          id: 'workshop/rag',
-          label: 'RAG (Retrieval-Augmented Generation)',
-        },
-        {
-          type: 'doc',
-          id: 'workshop/tracing',
-          label: 'Tracing',
-        },
-        {
-          type: 'doc',
-          id: 'workshop/conclusion',
-          label: 'Conclusion',
-        }
-      ],
-    },
-
   ],
   communitySidebar: [
     {

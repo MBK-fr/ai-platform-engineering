@@ -21,9 +21,8 @@ DOCKER_COMPOSE_BUILD_ENV := DOCKER_BUILDKIT=1 COMPOSE_PARALLEL_LIMIT=$(COMPOSE_P
 .PHONY: \
 	setup-venv start-venv clean-pyc clean-venv clean-build-artifacts clean \
 	uv-prep \
-	lint lint-fix test test-compose-generator test-compose-generator-coverage \
+	lint lint-fix test \
 	test-rag-unit test-rag-coverage test-rag-memory test-rag-scale validate lock-all help \
-	beads-gh-issues-sync beads-gh-issues-sync-run beads-list beads-ready beads-sync \
 	caipe-ui caipe-ui-install caipe-ui-build caipe-ui-dev caipe-ui-tests caipe-ui-e2e-rbac \
 	build-caipe-ui run-caipe-ui-docker caipe-ui-docker-compose \
 	caipe-ui-hot caipe-ui-prod \
@@ -104,7 +103,8 @@ caipe-ui-e2e-rbac: ## Run mocked RBAC Playwright regression (dev server on :3000
 			--config=playwright.rbac.config.ts
 
 migrate-canonical-team-membership: ## Backfill team_membership_sources from legacy teams.members[] and $$unset the field. Dry-run by default; APPLY=1 to apply.
-	@# See docs/docs/security/rbac/canonical-team-membership-migration.md
+	@# One-shot migration for spec 2026-05-26-canonical-team-membership.
+	@# See docs/docs/specs/2026-05-26-canonical-team-membership/mongodb-migration.md
 	@# for the operator runbook (dry-run, apply, verify, roll back).
 	@APPLY_FLAG="$${APPLY:-false}"; \
 	if [ "$$APPLY_FLAG" = "1" ] || [ "$$APPLY_FLAG" = "true" ]; then \
@@ -229,16 +229,6 @@ lint-fix: setup-venv ## Automatically fix linting issues using Ruff
 
 ## ========== Test ==========
 
-test-compose-generator: setup-venv ## Run unit tests for docker-compose generator
-	@echo "Running docker-compose generator tests..."
-	@. .venv/bin/activate && uv add pytest pyyaml --dev
-	@. .venv/bin/activate && uv run python -m pytest scripts/test_generate_docker_compose.py -v --tb=short
-
-test-compose-generator-coverage: setup-venv ## Run docker-compose generator tests with coverage
-	@echo "Running docker-compose generator tests with coverage..."
-	@. .venv/bin/activate && uv add pytest pytest-cov pyyaml --dev
-	@. .venv/bin/activate && uv run python -m pytest scripts/test_generate_docker_compose.py -v --cov=generate_docker_compose --cov-report=term-missing --cov-report=html
-
 test-core: setup-venv ## Run tests for the core/shared workspace (utils, dynamic_agents, etc.)
 	@echo "Running core workspace tests..."
 	@. .venv/bin/activate && uv add pytest-asyncio --group unittest
@@ -358,25 +348,6 @@ lock-all:
 		); \
 	done
 
-## ========== Beads Issue Tracking ==========
-
-beads-gh-issues-sync: ## Sync beads issues to GitHub Issues (dry-run by default)
-	@echo "Syncing beads to GitHub Issues..."
-	@./scripts/sync_beads_to_github.sh --dry-run
-
-beads-gh-issues-sync-run: ## Actually sync beads to GitHub Issues (creates issues)
-	@echo "Syncing beads to GitHub Issues (LIVE)..."
-	@./scripts/sync_beads_to_github.sh
-
-beads-list: ## List all beads issues
-	@bd list
-
-beads-ready: ## Show beads ready for work
-	@bd ready
-
-beads-sync: ## Sync beads with git
-	@bd sync
-
 ## ========== Release & Versioning ==========
 release: setup-venv  ## Bump version and create a release
 	@uv tool install commitizen
@@ -474,13 +445,13 @@ scan-images: ## Scan all locally built images with grype (make scan-images GRYPE
 		echo "✓ All images passed grype scan"; \
 	fi
 
-scan-image: ## Scan a single image with grype (make scan-image IMG=ghcr.io/cnoe-io/mcp-splunk:localtag)
+scan-image: ## Scan a single image with grype (make scan-image IMG=ghcr.io/caipe-io/mcp-splunk:localtag)
 	@command -v grype >/dev/null 2>&1 || { echo "grype not found. Install: brew install grype"; exit 1; }
 	@[ -n "$(IMG)" ] || { echo "Usage: make scan-image IMG=<image:tag>"; exit 1; }
 	@grype "$(IMG)" --fail-on "$(GRYPE_SEVERITY)"
 
 ## ========== RBAC tests ==========
-# See tests/rbac/README.md.
+# See docs/docs/specs/102-comprehensive-rbac-tests-and-completion/quickstart.md
 
 # Profile selection. Override with E2E_PROFILES=...
 # All profiles live in docker-compose.dev.yaml — no separate e2e compose file.
