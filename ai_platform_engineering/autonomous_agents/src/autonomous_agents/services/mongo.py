@@ -823,14 +823,16 @@ class MongoService:
         await self._conversations().update_one(
             {"_id": conv_id},
             {
-                # Keep ``participants`` under ``$set`` so older
-                # autonomous conversations self-heal the next time the
-                # publisher touches them; no separate migration needed.
+                # Keep autonomous provenance and ``participants`` under
+                # ``$set`` so older task conversations self-heal the next time
+                # the publisher touches them; no separate migration needed.
                 "$set": {
                     "title": effective_title,
                     "agent_id": effective_agent,
                     "participants": participants,
                     "updated_at": now,
+                    "source": "autonomous",
+                    "task_id": effective_task_id,
                     "metadata": {
                         "agent_version": "autonomous-agents",
                         "model_used": "autonomous",
@@ -850,8 +852,6 @@ class MongoService:
                     "tags": ["autonomous", effective_task_id],
                     "is_archived": False,
                     "is_pinned": False,
-                    "source": "autonomous",
-                    "task_id": effective_task_id,
                 },
             },
             upsert=True,

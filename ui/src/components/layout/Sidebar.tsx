@@ -88,11 +88,23 @@ type ConversationListItem =
     };
 
 function getAutonomousBadge(conv: Conversation): ConversationTitleBadge | null {
-  if (conv.source !== "autonomous") return null;
-
   const metadataTaskName = conv.metadata?.task_name;
+  const metadataTaskId = conv.metadata?.task_id;
+  const taskId =
+    conv.task_id?.trim() ||
+    (typeof metadataTaskId === "string" ? metadataTaskId.trim() : "");
+  const hasAutonomousSource =
+    conv.source === "autonomous" || conv.metadata?.source === "autonomous";
+  const hasLegacyAutonomousMarkers =
+    /^\[Autonomous\](?:\s|$)/i.test(conv.title);
+
+  // Conversations created before autonomous provenance became a top-level
+  // field may only carry the reserved title prefix. Keep those out of normal
+  // Chat history immediately; the backend also repairs their provenance when
+  // the task is next touched.
+  if (!hasAutonomousSource && !hasLegacyAutonomousMarkers) return null;
+
   const titleTaskName = conv.title.replace(/^\[Autonomous\]\s*/i, "").trim();
-  const taskId = conv.task_id?.trim();
   const label =
     typeof metadataTaskName === "string" && metadataTaskName.trim()
       ? metadataTaskName.trim()

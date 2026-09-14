@@ -472,6 +472,41 @@ class TestChatHistory:
             {"type": "agent", "id": "github"},
         ]
 
+    async def test_existing_task_conversation_self_heals_autonomous_provenance(
+        self, service: MongoService
+    ):
+        """Legacy task chats without top-level provenance leave normal Chat history."""
+        task_id = "legacy-task"
+        conv_id = conversation_id_for_task(task_id)
+        await service._conversations().insert_one(
+            {
+                "_id": conv_id,
+                "title": "[Autonomous] Legacy Task",
+                "owner_id": "alice@example.com",
+                "created_at": _spaced(0),
+                "updated_at": _spaced(0),
+            }
+        )
+
+        await service.publish_run(
+            TaskRun(
+                run_id="legacy-run",
+                task_id=task_id,
+                task_name="Legacy Task",
+                status=TaskStatus.SUCCESS,
+                started_at=_spaced(1),
+                finished_at=_spaced(2),
+            ),
+            prompt="hello",
+            response="world",
+            error=None,
+            agent="github",
+        )
+
+        conv = await service._conversations().find_one({"_id": conv_id})
+        assert conv["source"] == "autonomous"
+        assert conv["task_id"] == task_id
+
     async def test_publish_run_is_idempotent_across_status_transitions(self, service: MongoService):
         """RUNNING => SUCCESS overwrites the existing message slots; no duplicates."""
         run = TaskRun(

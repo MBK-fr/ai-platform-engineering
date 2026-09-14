@@ -573,6 +573,39 @@ describe('Sidebar — Live Status Indicator', () => {
       expect(screen.getByText('Legacy task title')).toHaveClass('border-violet-500/30')
     })
 
+    it('classifies legacy task-marked conversations as autonomous without top-level source', () => {
+      mockConversations = [
+        makeConv('legacy-autonomous', '[Autonomous] Legacy task title', {
+          metadata: { task_id: 'legacy-task-a1b2', task_name: 'Legacy task title' },
+        }),
+        makeConv('normal', 'Normal Chat'),
+      ]
+
+      render(<Sidebar {...defaultProps} />)
+
+      expect(screen.getByText('Normal Chat')).toBeInTheDocument()
+      expect(screen.queryByText('Legacy task title')).not.toBeInTheDocument()
+
+      const autonomous = screen.getByRole('tab', { name: /Autonomous/i })
+      expect(autonomous).toHaveAccessibleName('Autonomous (1)')
+      fireEvent.click(autonomous)
+
+      expect(screen.getByText('Legacy task title')).toBeInTheDocument()
+      expect(screen.queryByText('Normal Chat')).not.toBeInTheDocument()
+    })
+
+    it('classifies title-only legacy autonomous conversations', () => {
+      mockConversations = [makeConv('legacy-autonomous', '[Autonomous] Old task')]
+
+      render(<Sidebar {...defaultProps} />)
+
+      expect(screen.queryByText('Old task')).not.toBeInTheDocument()
+      const autonomous = screen.getByRole('tab', { name: /Autonomous/i })
+      expect(autonomous).toHaveAccessibleName('Autonomous (1)')
+      fireEvent.click(autonomous)
+      expect(screen.getByText('Old task')).toBeInTheDocument()
+    })
+
     it('switches between chat, scheduled, and autonomous conversation views', () => {
       mockConversations = [
         makeConv('conv-normal', 'Normal Chat'),
