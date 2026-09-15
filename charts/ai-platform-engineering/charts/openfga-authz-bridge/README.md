@@ -8,17 +8,17 @@ Envoy ext_authz bridge that adapts AgentGateway authorization checks to OpenFGA
 
 | | |
 |---|---|
-| **Version** | `1.0.0` |
+| **Version** | `1.1.0` |
 | **Type** | application |
 
 ## Quick Start
 
 ```bash
 # Add and install the chart
-helm install openfga-authz-bridge oci://ghcr.io/caipe-io/charts/openfga-authz-bridge --version 1.0.0
+helm install openfga-authz-bridge oci://ghcr.io/caipe-io/charts/openfga-authz-bridge --version 1.1.0
 
 # Upgrade an existing release
-helm upgrade openfga-authz-bridge oci://ghcr.io/caipe-io/charts/openfga-authz-bridge --version 1.0.0
+helm upgrade openfga-authz-bridge oci://ghcr.io/caipe-io/charts/openfga-authz-bridge --version 1.1.0
 ```
 
 ## Customizing Values
@@ -27,15 +27,15 @@ Override default values using `--set` flags or a custom values file:
 
 ```bash
 # Override individual values
-helm install openfga-authz-bridge oci://ghcr.io/caipe-io/charts/openfga-authz-bridge --version 1.0.0 \
+helm install openfga-authz-bridge oci://ghcr.io/caipe-io/charts/openfga-authz-bridge --version 1.1.0 \
   --set replicaCount=2
 
 # Use a custom values file
-helm install openfga-authz-bridge oci://ghcr.io/caipe-io/charts/openfga-authz-bridge --version 1.0.0 \
+helm install openfga-authz-bridge oci://ghcr.io/caipe-io/charts/openfga-authz-bridge --version 1.1.0 \
   -f custom-values.yaml
 
 # Show all configurable values
-helm show values oci://ghcr.io/caipe-io/charts/openfga-authz-bridge --version 1.0.0
+helm show values oci://ghcr.io/caipe-io/charts/openfga-authz-bridge --version 1.1.0
 ```
 
 ## Reading the Values Table
@@ -93,6 +93,7 @@ helm show values oci://ghcr.io/caipe-io/charts/openfga-authz-bridge --version 1.
 | service.port | int | `9100` |  |
 | service.type | string | `"ClusterIP"` |  |
 | serviceAccount.annotations | object | `{}` |  |
+| serviceAccount.automount | bool | `false` |  |
 | serviceAccount.create | bool | `true` |  |
 | serviceAccount.name | string | `""` |  |
 | tokenValidation.algorithms[0] | string | `"RS256"` |  |

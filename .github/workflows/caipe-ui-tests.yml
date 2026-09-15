@@ -305,7 +305,7 @@ jobs:
       contents: read
       packages: read
     container:
-      image: mcr.microsoft.com/playwright:v1.61.0-noble
+      image: mcr.microsoft.com/playwright:v1.62.1-noble
 
     steps:
       - name: 🔒 Harden runner
@@ -475,4 +475,4 @@ jobs:
 
       - name: Run ESLint
         working-directory: ui
-        run: npm run lint
+        run: npm run lint -- --max-warnings 0
