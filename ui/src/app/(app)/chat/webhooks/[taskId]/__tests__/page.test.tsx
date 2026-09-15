@@ -26,13 +26,13 @@ jest.mock("@/components/autonomous/RunHistory", () => ({
   RunHistory: (props: {
     taskId: string;
     triggerType: string;
-    allowWebhookFollowUp?: boolean;
+    allowFollowUp?: boolean;
   }) => (
     <div
       data-testid="run-history"
       data-task-id={props.taskId}
       data-trigger-type={props.triggerType}
-      data-follow-up={String(props.allowWebhookFollowUp)}
+      data-follow-up={String(props.allowFollowUp)}
     />
   ),
 }));
