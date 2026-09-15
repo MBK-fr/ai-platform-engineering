@@ -791,6 +791,35 @@ class TestFollowUp:
             parent.execution_context_id
         )
 
+    async def test_scheduled_followup_reuses_only_selected_run_context(
+        self, store: _DictRunStore, cron_task: TaskDefinition
+    ):
+        """Cron follow-ups inherit the selected run, not the latest task run."""
+        invoke = AsyncMock(return_value=("ok", []))
+        with patch(
+            "autonomous_agents.services.task_runner.invoke_dynamic_agent_streaming",
+            new=invoke,
+        ):
+            selected = await execute_task(cron_task, run_id="scheduled-selected")
+            latest = await execute_task(cron_task, run_id="scheduled-latest")
+            follow_up = await execute_task(
+                cron_task,
+                follow_up=FollowUpContext(
+                    parent_run_id=selected.run_id,
+                    user_text="continue the earlier result",
+                    transport="webui",
+                ),
+                run_id="scheduled-follow-up",
+            )
+
+        assert selected.execution_context_id != latest.execution_context_id
+        assert follow_up.parent_run_id == selected.run_id
+        assert follow_up.root_run_id == selected.run_id
+        assert follow_up.execution_context_id == selected.execution_context_id
+        assert invoke.await_args_list[2].kwargs["conversation_id"] == (
+            selected.execution_context_id
+        )
+
 
 def _job_task(
     task_id: str = "t1",

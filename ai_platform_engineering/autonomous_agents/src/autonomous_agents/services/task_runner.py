@@ -309,35 +309,34 @@ async def execute_task(
     """
     run_id = run_id or str(uuid.uuid4())
     root_run_id: str | None = None
-    if isinstance(task.trigger, WebhookTrigger):
-        if follow_up is None:
-            # Every initial delivery gets a separate Dynamic Agents context.
-            # The UI groups these by task, but the model/checkpointer must not
-            # inherit state from an unrelated webhook payload.
-            root_run_id = run_id
-            execution_context_id = conversation_id_for_webhook_run(task.id, root_run_id)
+    if follow_up is not None:
+        # A UI follow-up must inherit the explicitly selected run's context,
+        # regardless of whether that run came from cron, interval, manual, or
+        # webhook execution. The stable task chat is only a display grouping.
+        recent_runs = await get_run_store().list_by_task(task.id, limit=500)
+        parent = next(
+            (candidate for candidate in recent_runs if candidate.run_id == follow_up.parent_run_id),
+            None,
+        )
+        if parent is not None and parent.execution_context_id:
+            root_run_id = parent.root_run_id or parent.run_id
+            execution_context_id = parent.execution_context_id
         else:
-            # Follow-ups inherit only the selected parent run's context. Routes
-            # validate parent ownership before enqueueing; this lookup carries
-            # the durable context id through the asynchronous worker boundary.
-            recent_runs = await get_run_store().list_by_task(task.id, limit=500)
-            parent = next(
-                (candidate for candidate in recent_runs if candidate.run_id == follow_up.parent_run_id),
-                None,
+            # Runs created before isolated execution contexts used the stable
+            # per-task conversation id. Preserve that legacy context rather
+            # than silently starting an unrelated conversation.
+            root_run_id = (
+                (parent.root_run_id or parent.run_id)
+                if parent
+                else follow_up.parent_run_id
             )
-            if parent is not None and parent.execution_context_id:
-                root_run_id = parent.root_run_id or parent.run_id
-                execution_context_id = parent.execution_context_id
-            else:
-                # Legacy webhook runs used the per-task context and have no
-                # execution_context_id. Preserve that context for continuations
-                # instead of silently losing the prior conversation state.
-                root_run_id = (
-                    (parent.root_run_id or parent.run_id)
-                    if parent
-                    else follow_up.parent_run_id
-                )
-                execution_context_id = conversation_id_for_task(task.id)
+            execution_context_id = conversation_id_for_task(task.id)
+    elif isinstance(task.trigger, WebhookTrigger):
+        # Every initial delivery gets a separate Dynamic Agents context.
+        # The UI groups these by task, but the model/checkpointer must not
+        # inherit state from an unrelated webhook payload.
+        root_run_id = run_id
+        execution_context_id = conversation_id_for_webhook_run(task.id, root_run_id)
     else:
         # Cron, interval, and manual fires each start with clean model state.
         # Their results still append to one stable UI conversation below.

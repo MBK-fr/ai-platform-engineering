@@ -182,6 +182,10 @@ export interface Message {
     is_final?: boolean;
     timeline_segments?: TimelineSegment[]; // Persisted for plan/thinking/answer reconstruction
     task_id?: string;
+    run_id?: string;
+    kind?: string;
+    execution_context_id?: string;
+    parent_run_id?: string;
     turn_status?: string;
     is_interrupted?: boolean;
     // Slack linking metadata — set on messages persisted by the Slack bot so

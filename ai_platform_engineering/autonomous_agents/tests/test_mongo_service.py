@@ -433,6 +433,11 @@ class TestChatHistory:
         msgs = [doc async for doc in service._messages().find({})]
         assert len(convs) == 1
         assert len(msgs) == 2
+        assert {message["metadata"]["run_id"] for message in msgs} == {"run-001"}
+        assert {message["metadata"]["kind"] for message in msgs} == {
+            "run_request",
+            "run_response",
+        }
 
     async def test_conversation_id_matches_ui_uuid_shape(self, service: MongoService):
         """Derived conversation id matches the UI's ``validateUUID`` regex."""

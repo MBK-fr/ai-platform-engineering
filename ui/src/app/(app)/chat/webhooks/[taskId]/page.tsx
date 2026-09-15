@@ -116,7 +116,7 @@ function WebhookTaskHistory() {
         <RunHistory
           taskId={task.id}
           triggerType="webhook"
-          allowWebhookFollowUp
+          allowFollowUp
         />
       </div>
     </main>

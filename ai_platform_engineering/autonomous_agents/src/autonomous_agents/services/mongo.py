@@ -890,6 +890,9 @@ class MongoService:
         if run is not None:
             meta["task_id"] = run.task_id
             meta["task_name"] = run.task_name
+            meta["run_id"] = run.run_id
+            if run.parent_run_id:
+                meta["parent_run_id"] = run.parent_run_id
             if run.execution_context_id:
                 meta["execution_context_id"] = run.execution_context_id
         if extra_meta:
