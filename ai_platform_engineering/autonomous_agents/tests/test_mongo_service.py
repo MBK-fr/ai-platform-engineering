@@ -448,6 +448,7 @@ class TestChatHistory:
             status=TaskStatus.SUCCESS,
             started_at=_spaced(0),
             finished_at=_spaced(1),
+            execution_context_id="run-context-r1",
         )
         await service.publish_run(
             run,
@@ -462,6 +463,7 @@ class TestChatHistory:
         assert conv["owner_id"] == "autonomous@system"
         assert conv["agent_id"] == "github"
         assert conv["task_id"] == "weekly-prs"
+        assert conv["execution_context_id"] == "run-context-r1"
         assert conv["metadata"]["task_name"] == "Weekly PR Review"
         assert "autonomous" in conv["tags"]
         assert "weekly-prs" in conv["tags"]

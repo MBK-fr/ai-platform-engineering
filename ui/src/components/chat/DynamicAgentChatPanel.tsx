@@ -1002,8 +1002,14 @@ export function ChatPanel({
         ? Date.now() - state.startedAt
         : undefined;
 
+    const finalContent = state.accumulatedText || (
+      state.hasError && state.errorMessage
+        ? `**Error:** ${state.errorMessage}`
+        : ""
+    );
+
     updateMessage(conversationId, assistantMsgId, {
-      content: state.accumulatedText,
+      content: finalContent,
       rawStreamContent: state.rawStreamContent,
       isFinal,
       turnStatus,
@@ -2680,8 +2686,8 @@ const ChatMessage = React.memo(function ChatMessage({
                 <MarkdownRenderer content={displayContent} />
               </div>
             ) : message.turnStatus === "interrupted" ? (
-              <div className="text-xs text-muted-foreground italic px-1">
-                This response failed to complete. No content was generated.
+              <div className="text-xs text-destructive px-1">
+                {message.error || "This response failed to complete. No content was generated."}
               </div>
             ) : null}
 

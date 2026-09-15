@@ -820,25 +820,33 @@ class MongoService:
         if effective_agent:
             participants.append({"type": "agent", "id": effective_agent})
 
+        conversation_fields: dict[str, Any] = {
+            "title": effective_title,
+            "agent_id": effective_agent,
+            "participants": participants,
+            "updated_at": now,
+            "source": "autonomous",
+            "task_id": effective_task_id,
+            "metadata": {
+                "agent_version": "autonomous-agents",
+                "model_used": "autonomous",
+                "task_name": effective_task_name,
+            },
+        }
+        if run is not None and run.execution_context_id:
+            # The visible task chat is stable across runs, but interactive
+            # replies must continue the latest run's isolated checkpointer
+            # context. The UI gateway reads this server-owned pointer and
+            # rewrites only the runtime request; messages remain in conv_id.
+            conversation_fields["execution_context_id"] = run.execution_context_id
+
         await self._conversations().update_one(
             {"_id": conv_id},
             {
                 # Keep autonomous provenance and ``participants`` under
                 # ``$set`` so older task conversations self-heal the next time
                 # the publisher touches them; no separate migration needed.
-                "$set": {
-                    "title": effective_title,
-                    "agent_id": effective_agent,
-                    "participants": participants,
-                    "updated_at": now,
-                    "source": "autonomous",
-                    "task_id": effective_task_id,
-                    "metadata": {
-                        "agent_version": "autonomous-agents",
-                        "model_used": "autonomous",
-                        "task_name": effective_task_name,
-                    },
-                },
+                "$set": conversation_fields,
                 "$setOnInsert": {
                     "_id": conv_id,
                     "owner_id": effective_owner,
@@ -882,6 +890,8 @@ class MongoService:
         if run is not None:
             meta["task_id"] = run.task_id
             meta["task_name"] = run.task_name
+            if run.execution_context_id:
+                meta["execution_context_id"] = run.execution_context_id
         if extra_meta:
             meta.update(extra_meta)
 
