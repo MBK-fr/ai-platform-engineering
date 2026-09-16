@@ -1,3 +1,33 @@
+## 1.2.0-dev.4 (2026-09-15)
+
+### Fix
+
+- **rag**: update E2E specs for the redesigned Unlinked Access modal
+- **rag**: show live progress while applying a bulk scope add
+
+### Perf
+
+- **rag**: batch bulk scope adds into one request instead of N
+
+## 1.2.0-dev.3 (2026-09-14)
+
+### Fix
+
+- **ui**: enforce zero lint warnings (#2743)
+
+## 1.2.0-dev.2 (2026-09-14)
+
+### Feat
+
+- **rag**: bulk-add datasources from a collection in service account pickers
+
+### Fix
+
+- **deps**: resolve install warnings and security alerts (#2742)
+- **rag**: keep unlinked SA edit UX in sync, fix long scope-list usability
+
+## 1.2.0-dev.1 (2026-09-14)
+
 ## 1.2.0-rc.1 (2026-09-14)
 
 ## 1.1.0 (2026-09-14)
