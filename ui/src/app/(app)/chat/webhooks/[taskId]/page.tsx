@@ -108,12 +108,13 @@ function WebhookTaskHistory() {
         </div>
 
         <div className="rounded-md border border-orange-500/30 bg-orange-500/10 px-3 py-2 text-sm text-foreground">
-          Each webhook delivery has its own conversation context. Expand a completed run and
-          choose <span className="font-medium">Continue this run</span> to follow up using only
-          that delivery&apos;s context.
+          Each webhook delivery has its own conversation context. The chat input below
+          replies to the latest run. To follow up on an older run, expand it and choose
+          <span className="font-medium"> Continue this run</span>.
         </div>
 
         <RunHistory
+          key={task.id}
           taskId={task.id}
           triggerType="webhook"
           allowFollowUp

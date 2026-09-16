@@ -5,7 +5,8 @@
 
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
-import { RefreshCw, ChevronDown, ChevronRight, MessageSquare } from "lucide-react";
+import { RefreshCw, ChevronDown, ChevronRight, MessageSquare, Send } from "lucide-react";
+import TextareaAutosize from "react-textarea-autosize";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,7 +25,7 @@ interface RunHistoryProps {
    * for the polling interval.
    */
   refreshKey?: number;
-  /** Allow an operator to continue the exact execution context of a selected run. */
+  /** Show a latest-run composer and continuation buttons on older runs. */
   allowFollowUp?: boolean;
 }
 
@@ -133,6 +134,9 @@ export function RunHistory({
   const [submittingFollowUp, setSubmittingFollowUp] = useState(false);
   const [followUpError, setFollowUpError] = useState<string | null>(null);
   const [followUpNotice, setFollowUpNotice] = useState<string | null>(null);
+  const [latestDraft, setLatestDraft] = useState<{ runId: string; text: string } | null>(null);
+  const [latestReplyError, setLatestReplyError] = useState<string | null>(null);
+  const [pendingLatestReply, setPendingLatestReply] = useState<string | null>(null);
   // Track in-flight requests so a slow response doesn't clobber a
   // newer one — important once the auto-poll kicks in.
   const inflightRef = useRef(0);
@@ -149,6 +153,9 @@ export function RunHistory({
       // Replace the array only when something actually changed, so an
       // unchanged poll does not re-render (and visibly jitter) open rows.
       setRuns((prev) => (runsSignature(prev) === runsSignature(data) ? prev : data));
+      setPendingLatestReply((pending) => data.some(
+        (run) => run.run_id === pending && !["pending", "running"].includes(run.status),
+      ) ? null : pending);
       setError(null);
     } catch (err) {
       if (requestId !== inflightRef.current) return;
@@ -189,6 +196,26 @@ export function RunHistory({
   };
 
   const orderedRuns = useMemo(() => orderRunThreads(runs), [runs]);
+  // Thread ordering nests replies under their parents, so the first row is not
+  // necessarily the most recent execution. Include active runs to avoid silently
+  // replying to an older context while the newest run is still in progress.
+  const latestRun = useMemo(
+    () => runs.reduce<TaskRun | null>(
+      (latest, run) => !latest || Date.parse(run.started_at) > Date.parse(latest.started_at)
+        ? run
+        : latest,
+      null,
+    ),
+    [runs],
+  );
+  // Polling must not switch contexts underneath a message the user is typing.
+  const replyRun = latestDraft?.text
+    ? runs.find((run) => run.run_id === latestDraft.runId)
+    : latestRun;
+  const canReply = Boolean(
+    !pendingLatestReply && replyRun?.execution_context_id &&
+    !["pending", "running"].includes(replyRun.status),
+  );
 
   const beginFollowUp = (runId: string) => {
     setReplyingTo(runId);
@@ -203,24 +230,30 @@ export function RunHistory({
     setFollowUpError(null);
   };
 
-  const submitFollowUp = async (run: TaskRun) => {
-    const message = followUpText.trim();
+  const submitFollowUp = async (run: TaskRun, fromComposer = false) => {
+    if (submittingFollowUp) return;
+    const message = (fromComposer ? latestDraft?.text ?? "" : followUpText).trim();
+    const setReplyError = fromComposer ? setLatestReplyError : setFollowUpError;
     if (!message) {
-      setFollowUpError("Enter a message before continuing this run.");
+      setReplyError("Enter a message before continuing this run.");
       return;
     }
     setSubmittingFollowUp(true);
-    setFollowUpError(null);
+    setReplyError(null);
     try {
       const accepted = await autonomousApi.followUpRun(taskId, run.run_id, message);
-      setFollowUpNotice(
-        `Follow-up queued for run ${run.run_id}. New run: ${accepted.run_id}.`,
-      );
-      setReplyingTo(null);
-      setFollowUpText("");
+      setFollowUpNotice("Reply queued. The response will appear in run history.");
+      // Wait for the accepted continuation, even before polling observes it.
+      if (fromComposer) {
+        setPendingLatestReply(accepted.run_id);
+        setLatestDraft(null);
+      } else {
+        setReplyingTo(null);
+        setFollowUpText("");
+      }
       await load({ silent: true });
     } catch (err) {
-      setFollowUpError(
+      setReplyError(
         err instanceof AutonomousApiError ? err.message : "Failed to continue this run.",
       );
     } finally {
@@ -394,6 +427,7 @@ export function RunHistory({
                     </div>
                   )}
                   {allowFollowUp &&
+                    run.run_id !== latestRun?.run_id &&
                     run.execution_context_id &&
                     !["pending", "running"].includes(run.status) && (
                       <div className="border-t border-border pt-2">
@@ -458,6 +492,78 @@ export function RunHistory({
           );
         })}
       </ul>
+      {allowFollowUp && latestRun && !error && (
+        <div className="sticky bottom-0 z-10 bg-background pb-2 pt-3">
+          <form
+            aria-label="Reply to latest run"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (replyRun && canReply) void submitFollowUp(replyRun, true);
+            }}
+            className="rounded-xl border border-border bg-card p-3"
+          >
+            <div className="mb-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+              <span>
+                {latestDraft?.text && latestDraft.runId !== latestRun.run_id
+                  ? `Replying to run ${latestDraft.runId}`
+                  : "Reply to the latest run"}
+              </span>
+              {latestDraft?.text && latestDraft.runId !== latestRun.run_id && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={submittingFollowUp}
+                  onClick={() => {
+                    setLatestDraft({ runId: latestRun.run_id, text: latestDraft.text });
+                    setLatestReplyError(null);
+                  }}
+                >
+                  Reply to latest run
+                </Button>
+              )}
+            </div>
+            <div className="flex items-end gap-3">
+              <TextareaAutosize
+                aria-label="Message"
+                value={latestDraft?.text ?? ""}
+                onChange={(event) => {
+                  if (replyRun) setLatestDraft({ runId: replyRun.run_id, text: event.target.value });
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                    event.preventDefault();
+                    if (replyRun && canReply && latestDraft?.text.trim()) {
+                      void submitFollowUp(replyRun, true);
+                    }
+                  }
+                }}
+                minRows={1}
+                maxRows={10}
+                maxLength={10_000}
+                disabled={submittingFollowUp || !canReply}
+                placeholder={
+                  canReply
+                    ? "Ask a follow-up…"
+                    : !replyRun?.execution_context_id
+                      ? "This run's context is unavailable."
+                      : "Waiting for this run to finish…"
+                }
+                className="min-w-0 flex-1 resize-none bg-transparent px-3 py-2.5 text-sm outline-none"
+              />
+              <Button
+                type="submit"
+                size="icon"
+                aria-label="Send message"
+                disabled={submittingFollowUp || !canReply || !latestDraft?.text.trim()}
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
+            {latestReplyError && <p role="alert" className="mt-2 text-xs text-destructive">{latestReplyError}</p>}
+          </form>
+        </div>
+      )}
     </div>
   );
 }

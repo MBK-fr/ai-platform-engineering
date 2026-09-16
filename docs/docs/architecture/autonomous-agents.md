@@ -214,7 +214,11 @@ The Autonomous page polls active run history every five seconds.
 - Webhook **Run history** renders the full final response as Markdown.
 - Cron and interval Run history show the response preview and can link to the
   corresponding Chat thread when Chat publishing is enabled.
-- Webhook runs are never published into Chat history.
+- Webhook runs have a grouped task history under **Autonomous Runs → Webhook
+  Runs** in the Chat sidebar; they are not published as ordinary conversations.
+- For cron, interval, and webhook tasks, use the bottom chat input to reply to
+  the latest run. **Continue this run** appears only on older runs and replies
+  in the selected run's context. Each new task execution starts fresh context.
 
 `CHAT_HISTORY_PUBLISH_ENABLED` defaults to `false`. When enabled, cron and
 interval activity is published as one stable Chat conversation per task, with

@@ -37,6 +37,7 @@ jest.mock('lucide-react', () => ({
   ChevronDown: (props: Record<string, unknown>) => <span data-testid="icon-down" {...props} />,
   ChevronRight: (props: Record<string, unknown>) => <span data-testid="icon-right" {...props} />,
   MessageSquare: (props: Record<string, unknown>) => <span data-testid="icon-chat" {...props} />,
+  Send: () => <span />,
 }));
 
 jest.mock('@/components/shared/timeline/MarkdownRenderer', () => ({
@@ -213,7 +214,8 @@ describe('RunHistory selected-run follow-up', () => {
     'continues the explicitly selected %s run',
     async (triggerType) => {
       const run = makeRun({ run_id: `${triggerType}-run` });
-      mockListRuns.mockResolvedValue([run]);
+      const latest = makeRun({ run_id: 'latest-run', started_at: '2026-04-20T10:00:00Z' });
+      mockListRuns.mockResolvedValue([run, latest]);
       mockFollowUpRun.mockResolvedValue({
         status: 'accepted',
         task_id: 't-1',
@@ -225,6 +227,8 @@ describe('RunHistory selected-run follow-up', () => {
         <RunHistory taskId="t-1" triggerType={triggerType} allowFollowUp />,
       );
       fireEvent.click(await screen.findByText(run.run_id));
+      fireEvent.click(screen.getByText(latest.run_id));
+      expect(screen.getAllByRole('button', { name: 'Continue this run' })).toHaveLength(1);
       fireEvent.click(screen.getByRole('button', { name: 'Continue this run' }));
       fireEvent.change(screen.getByPlaceholderText(/using only this run's context/i), {
         target: { value: 'Investigate this exact result' },
@@ -249,5 +253,107 @@ describe('RunHistory selected-run follow-up', () => {
     fireEvent.click(await screen.findByText(run.run_id));
 
     expect(screen.queryByRole('button', { name: 'Continue this run' })).toBeNull();
+    expect(screen.getByRole('textbox', { name: 'Message' })).toBeDisabled();
+  });
+});
+
+describe('RunHistory latest-run composer', () => {
+  it.each(['cron', 'interval', 'webhook'] as const)(
+    'replies directly to the latest %s run without a continuation button',
+    async (triggerType) => {
+      const run = makeRun();
+      mockListRuns.mockResolvedValue([run]);
+      mockFollowUpRun.mockResolvedValue({ run_id: 'reply-1' });
+      render(<RunHistory taskId="t-1" triggerType={triggerType} allowFollowUp />);
+
+      fireEvent.click(await screen.findByText(run.run_id));
+      expect(screen.queryByRole('button', { name: 'Continue this run' })).toBeNull();
+      fireEvent.change(screen.getByRole('textbox', { name: 'Message' }), {
+        target: { value: 'Explain the result' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+
+      await waitFor(() => expect(mockFollowUpRun).toHaveBeenCalledWith('t-1', run.run_id, 'Explain the result'));
+      await waitFor(() => expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue(''));
+      expect(screen.getByRole('button', { name: 'Send message' })).toBeDisabled();
+    },
+  );
+
+  it('continues the newest follow-up even when thread ordering puts its parent first', async () => {
+    const root = makeRun();
+    const reply = makeRun({ run_id: 'reply-1', parent_run_id: root.run_id, started_at: '2026-04-20T10:00:00Z' });
+    mockListRuns.mockResolvedValue([root, reply]);
+    mockFollowUpRun.mockResolvedValue({ run_id: 'reply-2' });
+    render(<RunHistory taskId="t-1" triggerType="webhook" allowFollowUp />);
+    await screen.findByText(reply.run_id);
+
+    const input = screen.getByRole('textbox', { name: 'Message' });
+    fireEvent.change(input, { target: { value: 'And then?' } });
+    fireEvent.keyDown(input, { key: 'Enter', shiftKey: true });
+    expect(mockFollowUpRun).not.toHaveBeenCalled();
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await waitFor(() => expect(mockFollowUpRun).toHaveBeenCalledWith('t-1', reply.run_id, 'And then?'));
+  });
+
+  it('does not fall back to an older context while the newest run is still running', async () => {
+    mockListRuns.mockResolvedValue([
+      makeRun(),
+      makeRun({ run_id: 'active', started_at: '2026-04-20T10:00:00Z', status: 'running' }),
+    ]);
+    render(<RunHistory taskId="t-1" triggerType="webhook" allowFollowUp />);
+    await screen.findByText('active');
+    expect(screen.getByRole('textbox', { name: 'Message' })).toBeDisabled();
+  });
+
+  it('allows the next reply after the queued response completes and follows new runs when empty', async () => {
+    const run = makeRun();
+    const reply = makeRun({ run_id: 'reply', parent_run_id: run.run_id, started_at: '2026-04-20T10:00:00Z' });
+    mockListRuns.mockResolvedValue([run]);
+    mockFollowUpRun.mockResolvedValue({ run_id: reply.run_id });
+    const { rerender } = render(<RunHistory taskId="t-1" triggerType="webhook" allowFollowUp />);
+    await screen.findByText(run.run_id);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Message' }), { target: { value: 'First reply' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue(''));
+    expect(screen.getByRole('textbox', { name: 'Message' })).toBeDisabled();
+
+    mockListRuns.mockResolvedValue([run, reply]);
+    rerender(<RunHistory taskId="t-1" triggerType="webhook" allowFollowUp refreshKey={1} />);
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Message' })).toBeEnabled());
+
+    const newer = makeRun({ run_id: 'newer', started_at: '2026-04-21T10:00:00Z' });
+    mockListRuns.mockResolvedValue([run, reply, newer]);
+    rerender(<RunHistory taskId="t-1" triggerType="webhook" allowFollowUp refreshKey={2} />);
+    await screen.findByText(newer.run_id);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Message' }), { target: { value: 'Latest reply' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+    await waitFor(() => expect(mockFollowUpRun).toHaveBeenLastCalledWith('t-1', newer.run_id, 'Latest reply'));
+  });
+
+  it('retains the message when sending fails so it can be retried', async () => {
+    mockListRuns.mockResolvedValue([makeRun()]);
+    mockFollowUpRun.mockRejectedValueOnce(new Error('unavailable')).mockResolvedValueOnce({ run_id: 'reply' });
+    render(<RunHistory taskId="t-1" triggerType="webhook" allowFollowUp />);
+    await screen.findByText('r-1');
+    fireEvent.change(screen.getByRole('textbox', { name: 'Message' }), { target: { value: 'Retry me' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+    await screen.findByRole('alert');
+    expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue('Retry me');
+    fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+    await waitFor(() => expect(mockFollowUpRun).toHaveBeenCalledTimes(2));
+  });
+
+  it('keeps a draft on its original run when polling discovers a newer execution', async () => {
+    mockListRuns.mockResolvedValue([makeRun()]);
+    mockFollowUpRun.mockResolvedValue({ run_id: 'reply' });
+    const { rerender } = render(<RunHistory taskId="t-1" triggerType="webhook" allowFollowUp />);
+    await screen.findByText('r-1');
+    fireEvent.change(screen.getByRole('textbox', { name: 'Message' }), { target: { value: 'About this result' } });
+    mockListRuns.mockResolvedValue([makeRun(), makeRun({ run_id: 'newer', started_at: '2026-04-20T10:00:00Z' })]);
+    rerender(<RunHistory taskId="t-1" triggerType="webhook" allowFollowUp refreshKey={1} />);
+    await screen.findByText('newer');
+    expect(screen.getByText('Replying to run r-1')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+    await waitFor(() => expect(mockFollowUpRun).toHaveBeenCalledWith('t-1', 'r-1', 'About this result'));
   });
 });

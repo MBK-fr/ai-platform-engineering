@@ -279,6 +279,10 @@ export function ChatPanel({
   const accessToken = ssoEnabled ? session?.accessToken : undefined;
 
   const conversation = getActiveConversation();
+  // Typed replies keep using this run's context, even after untagged chat turns.
+  const latestAutonomousRunId = conversation?.messages.findLast(
+    (message) => message.autonomousRunId,
+  )?.autonomousRunId;
   const [pendingAutonomousFollowUps, setPendingAutonomousFollowUps] = useState<Set<string>>(
     () => new Set(),
   );
@@ -1837,7 +1841,7 @@ export function ChatPanel({
             {conversation?.source === "autonomous" && (
               <div className="mx-3 rounded-md border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-sm text-foreground">
                 Runs are grouped here for history, but each run has separate context. Use
-                <span className="font-medium"> Continue this run</span> on a result to follow
+                <span className="font-medium"> Continue this run</span> on an older result to follow
                 up on that exact run. The composer below continues the most recent run.
               </div>
             )}
@@ -2029,6 +2033,7 @@ export function ChatPanel({
                             conversation?.source === "autonomous" &&
                             !panelReadOnly &&
                             msg.autonomousRunId &&
+                            msg.autonomousRunId !== latestAutonomousRunId &&
                             msg.autonomousExecutionContextId &&
                             ["run_response", "run_error"].includes(
                               msg.autonomousMessageKind ?? "",
