@@ -35,6 +35,22 @@ for namespace in agentgateway-system ingress-nginx metallb-system; do
 done
 pass "auxiliary namespace cleanup is bounded"
 
+# The no-ingress/SSH path must configure a browser-reachable localhost issuer,
+# while server-side discovery stays on the in-cluster Keycloak service.
+grep -q -- '--port-forward-mode' "$SOURCE" \
+  || fail "port-forward mode is not exposed as an installer option"
+grep -q 'PORT_FORWARD_MODE=true' "$SOURCE" \
+  || fail "--no-ingress does not select port-forward mode"
+grep -q 'caipe-ui.config.OIDC_ISSUER=$(_browser_oidc_issuer)' "$SOURCE" \
+  || fail "no-ingress UI issuer is not browser-reachable"
+grep -q 'caipe-ui.config.OIDC_DISCOVERY_URL=$(_internal_oidc_issuer)' "$SOURCE" \
+  || fail "no-ingress discovery URL is not in-cluster"
+grep -q 'OIDC_DISCOVERY_URL: "$(_internal_oidc_issuer)"' "$SOURCE" \
+  || fail "dynamic-agents OIDC discovery URL is not in-cluster"
+grep -q 'if \[\[ -n "\${CAIPE_DOMAIN:-}" \]\] || ! \$ENABLE_INGRESS; then' "$SOURCE" \
+  || fail "post-deploy Keycloak setup does not run for no-ingress installs"
+pass "no-ingress uses split browser/server OIDC endpoints"
+
 # The default static AgentGateway path must not contact the CRD installers.
 awk '
   /^_install_agentgateway_crds\(\) \{/ { found=1 }
