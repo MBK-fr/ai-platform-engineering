@@ -39,13 +39,15 @@ ENABLE_PERSISTENCE="${ENABLE_PERSISTENCE:-true}"
 DATABASE_PROVIDER="${DATABASE_PROVIDER:-}"
 DOCUMENTDB_IMAGE_TAG="${DOCUMENTDB_IMAGE_TAG:-pg17-0.113.0}"
 OPENAI_API_KEY="${OPENAI_API_KEY:-}"
-OPENAI_ENDPOINT="https://api.openai.com/v1"
-OPENAI_MODEL_NAME="gpt-5.2"
+_OPENAI_ENDPOINT_EXPLICIT="${OPENAI_ENDPOINT:+set}"
+_OPENAI_MODEL_NAME_EXPLICIT="${OPENAI_MODEL_NAME:+set}"
+OPENAI_ENDPOINT="${OPENAI_ENDPOINT:-https://api.openai.com/v1}"
+OPENAI_MODEL_NAME="${OPENAI_MODEL_NAME:-gpt-5.2}"
 LITELLM_ENDPOINT="${LITELLM_ENDPOINT:-}"
 LITELLM_API_KEY="${LITELLM_API_KEY:-}"
 LITELLM_MODEL_NAME="${LITELLM_MODEL_NAME:-gpt-oss-20B}"
 ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}"
-ANTHROPIC_MODEL_NAME="claude-haiku-4-5-20251001"
+ANTHROPIC_MODEL_NAME="${ANTHROPIC_MODEL_NAME:-claude-haiku-4-5-20251001}"
 AWS_BEDROCK_MODEL_ID="${AWS_BEDROCK_MODEL_ID:-global.anthropic.claude-haiku-4-5-20251001-v1:0}"
 AWS_BEDROCK_PROVIDER="${AWS_BEDROCK_PROVIDER:-anthropic}"
 AWS_REGION="${AWS_REGION:-us-east-2}"
@@ -182,6 +184,9 @@ OLLAMA_PORT=11434
 OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-}"
 HF_TOKEN="${HF_TOKEN:-}"
 AGENTGATEWAY_VERSION="${AGENTGATEWAY_VERSION:-v2.2.1}"
+# The CAIPE chart defaults to CRD-free static routing. Set this to gateway-api
+# only when the cluster should host Gateway API/AgentGateway custom resources.
+AGENTGATEWAY_ROUTING_MODE="${AGENTGATEWAY_ROUTING_MODE:-static}"
 AGENTGATEWAY_PORT=8080
 KEYCLOAK_PORT=7080
 OPENFGA_PORT=18080
@@ -6137,6 +6142,7 @@ global:
     storeName: "caipe-openfga"
   agentgateway:
     enabled: true
+    routingMode: "${AGENTGATEWAY_ROUTING_MODE}"
     proxyPort: ${AGENTGATEWAY_PORT}
     extAuth:
       enabled: true
@@ -6208,27 +6214,47 @@ RBACEOF
   printf '%s' "$values_file"
 }
 
-# Install the CRDs that the AgentGateway proxy and Gateway API resources depend
-# on (Gateway API + agentgateway.dev). Idempotent. This MUST run before the
-# CAIPE Helm install when the RBAC runtime is enabled, because the chart renders
-# Gateway / HTTPRoute / AgentgatewayBackend / AgentgatewayPolicy objects that
-# Helm validates against installed CRDs at render time. Also reused by the
-# legacy deploy_agentgateway path.
+# Install the CRDs required by the optional Gateway API routing path (Gateway API
+# + agentgateway.dev). Static routing is the default and does not need any CRDs.
+# This helper is also reused by the legacy deploy_agentgateway path, which always
+# creates Gateway API resources.
 _install_agentgateway_crds() {
+  local _required="${1:-false}"
+  if [[ "$_required" != true && "$AGENTGATEWAY_ROUTING_MODE" == "static" ]]; then
+    log "Skipping Gateway API and AgentGateway CRDs (static AgentGateway routing)"
+    return 0
+  fi
+
   log "Installing Gateway API CRDs..."
-  kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml 2>&1 \
-    | tail -1 || true
+  if ! kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml; then
+    err "Gateway API CRD installation failed"
+    return 1
+  fi
+
   log "Installing AgentGateway CRDs..."
-  helm upgrade -i agentgateway-crds oci://ghcr.io/kgateway-dev/charts/agentgateway-crds \
+  if ! helm upgrade -i agentgateway-crds oci://ghcr.io/kgateway-dev/charts/agentgateway-crds \
     --create-namespace --namespace agentgateway-system \
-    --version "$AGENTGATEWAY_VERSION" 2>&1 | tail -1 || true
+    --version "$AGENTGATEWAY_VERSION"; then
+    err "AgentGateway CRD installation failed"
+    return 1
+  fi
+}
+
+_validate_agentgateway_routing_mode() {
+  case "$AGENTGATEWAY_ROUTING_MODE" in
+    static|gateway-api) ;;
+    *)
+      err "AGENTGATEWAY_ROUTING_MODE must be 'static' or 'gateway-api' (got: ${AGENTGATEWAY_ROUTING_MODE})"
+      return 1
+      ;;
+  esac
 }
 
 deploy_agentgateway() {
   step "Deploying AgentGateway (${AGENTGATEWAY_VERSION})"
 
   # 1-2. Install Gateway API + AgentGateway CRDs
-  _install_agentgateway_crds
+  _install_agentgateway_crds true
 
   # 3. Install AgentGateway control plane
   log "Installing AgentGateway control plane..."
@@ -8039,7 +8065,9 @@ cmd_cleanup() {
   if helm status agentgateway-crds -n agentgateway-system &>/dev/null; then
     if ask_yn "Uninstall AgentGateway CRDs?" "y"; then
       helm uninstall agentgateway-crds -n agentgateway-system 2>/dev/null || true
-      kubectl delete namespace agentgateway-system 2>/dev/null || true
+      if ! kubectl delete namespace agentgateway-system --timeout=120s 2>/dev/null; then
+        warn "agentgateway-system namespace did not finalize within 120s — it will remain in Terminating"
+      fi
       log "AgentGateway CRDs uninstalled"
     fi
   fi
@@ -8063,7 +8091,9 @@ cmd_cleanup() {
   if helm status ingress-nginx -n ingress-nginx &>/dev/null; then
     if ask_yn "Uninstall ingress-nginx Helm release?" "n"; then
       helm uninstall ingress-nginx -n ingress-nginx 2>/dev/null || true
-      kubectl delete namespace ingress-nginx 2>/dev/null || true
+      if ! kubectl delete namespace ingress-nginx --timeout=120s 2>/dev/null; then
+        warn "ingress-nginx namespace did not finalize within 120s — it will remain in Terminating"
+      fi
       log "ingress-nginx uninstalled"
     fi
   fi
@@ -8074,7 +8104,9 @@ cmd_cleanup() {
   # CRDs. Default with "n", it's shared cluster infra.
   if kubectl get namespace metallb-system &>/dev/null; then
     if ask_yn "Uninstall MetalLB?" "n"; then
-      kubectl delete namespace metallb-system 2>/dev/null || true
+      if ! kubectl delete namespace metallb-system --timeout=120s 2>/dev/null; then
+        warn "metallb-system namespace did not finalize within 120s — it will remain in Terminating"
+      fi
       kubectl get crd -o name 2>/dev/null | grep '\.metallb\.io$' | xargs -r kubectl delete 2>/dev/null || true
       log "MetalLB uninstalled"
     fi
@@ -8730,6 +8762,8 @@ BANNER
   # the same file and see the same cluster and contexts.
   export KUBECONFIG="${KUBECONFIG:-${HOME}/.kube/config}"
 
+  _validate_agentgateway_routing_mode
+
   choose_setup_target
   check_prerequisites
   _load_caipe_config
@@ -8808,13 +8842,20 @@ BANNER
       BEDROCK_TEMPERATURE
       AZURE_OPENAI_API_KEY AZURE_OPENAI_ENDPOINT AZURE_OPENAI_API_VERSION
       AZURE_OPENAI_DEPLOYMENT OPENAI_API_KEY OPENAI_API_BASE
+      OPENAI_ENDPOINT OPENAI_MODEL_NAME
       EMBEDDINGS_PROVIDER EMBEDDINGS_MODEL EMBEDDINGS_DEVICE
       COHERE_API_KEY VOYAGE_API_KEY HUGGINGFACEHUB_API_TOKEN HF_TOKEN
       LITELLM_ENDPOINT LITELLM_API_KEY)
     for _v in "${_llm_vars[@]}"; do
       local _val
       _val=$(_env_get "$ENV_FILE" "$_v")
-      [[ -n "$_val" && -z "${!_v:-}" ]] && export "$_v=$_val"
+      if [[ "$_v" == OPENAI_ENDPOINT ]]; then
+        [[ -n "$_val" && -z "${_OPENAI_ENDPOINT_EXPLICIT:-}" ]] && export "$_v=$_val"
+      elif [[ "$_v" == OPENAI_MODEL_NAME ]]; then
+        [[ -n "$_val" && -z "${_OPENAI_MODEL_NAME_EXPLICIT:-}" ]] && export "$_v=$_val"
+      else
+        [[ -n "$_val" && -z "${!_v:-}" ]] && export "$_v=$_val"
+      fi
     done
 
     # Honor feature toggles from --env-file so a single .env reproduces the same
@@ -8971,7 +9012,7 @@ BANNER
   # AgentgatewayPolicy). Helm validates those against installed CRDs at render
   # time, so the CRDs must exist BEFORE deploy_caipe. (The legacy non-RBAC
   # AgentGateway path installs them later inside deploy_agentgateway.)
-  if $ENABLE_RBAC_RUNTIME; then
+  if $ENABLE_RBAC_RUNTIME && [[ "$AGENTGATEWAY_ROUTING_MODE" == "gateway-api" ]]; then
     step "Installing AgentGateway + Gateway API CRDs"
     _install_agentgateway_crds
   fi
@@ -9214,6 +9255,7 @@ Re-run behavior:
 Environment variables (all optional):
   LLM_PROVIDER            LLM provider: anthropic-claude (default) | aws-bedrock | openai
   OPENAI_API_KEY          Pre-set OpenAI API key (skips prompt)
+  OPENAI_ENDPOINT         OpenAI-compatible API endpoint (default: https://api.openai.com/v1)
   OPENAI_MODEL_NAME       OpenAI model (default: gpt-5.2; used by LLMFactory)
   ANTHROPIC_API_KEY       Pre-set Anthropic API key (skips prompt)
   ANTHROPIC_MODEL_NAME    Anthropic model (default: claude-haiku-4-5)
@@ -9257,6 +9299,7 @@ Environment variables (all optional):
   DATABASE_PROVIDER       Persistence provider: mongodb (default) or documentdb
   DOCUMENTDB_IMAGE_TAG    DocumentDB Local image tag (default: pg17-0.113.0)
   AGENTGATEWAY_VERSION    AgentGateway Helm chart version (default: v2.2.1)
+  AGENTGATEWAY_ROUTING_MODE AgentGateway routing mode (default: static; set to gateway-api to install CRDs)
 
 LLM provider credentials are read from (in order):
   OpenAI:    1) OPENAI_API_KEY env       2) ~/.config/openai.txt    3) prompt
