@@ -6838,6 +6838,20 @@ DAEOF
         --set 'rag-stack.rag-server.env.OIDC_CLIENT_ID=caipe-ui'
         --set 'rag-stack.rag-server.env.OIDC_GROUP_CLAIM=members\,groups'
       )
+    elif $ENABLE_RBAC_RUNTIME && ! $ENABLE_INGRESS && ! _upstream_idp_configured; then
+      # In SSH/port-forward mode the browser token issuer is localhost, while
+      # discovery and JWKS must stay on the in-cluster Keycloak service. The
+      # RAG server validates interactive user tokens directly, so it needs the
+      # same browser-facing issuer as the UI and Dynamic Agents.
+      local _rag_browser_issuer
+      _rag_browser_issuer="$(_browser_oidc_issuer)"
+      helm_args+=(
+        --set "rag-stack.rag-server.env.OIDC_ISSUER=${_rag_browser_issuer}"
+        --set 'rag-stack.rag-server.env.OIDC_CLIENT_ID=caipe-ui'
+        --set 'rag-stack.rag-server.env.OIDC_GROUP_CLAIM=members\,groups'
+        --set "rag-stack.rag-server.env.OIDC_DISCOVERY_URL=$(_internal_oidc_issuer)/.well-known/openid-configuration"
+        --set "rag-stack.rag-server.env.OIDC_JWKS_URL=$(_internal_oidc_issuer)/protocol/openid-connect/certs"
+      )
     fi
     # Pre-load ingestor secret state from an existing cluster secret so that
     # re-runs (upgrade path) also get webIngestor.enabled=true without having

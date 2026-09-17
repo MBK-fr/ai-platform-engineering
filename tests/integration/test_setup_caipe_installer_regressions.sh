@@ -72,6 +72,14 @@ grep -q 'kind: "caller_token"' "$SOURCE" \
   || fail "Knowledge Base seed has no caller-token credential source"
 pass "RAG Knowledge Base MCP uses authenticated AgentGateway routing"
 
+# No-ingress RAG must validate the browser-issued token while fetching
+# discovery/JWKS over the in-cluster Keycloak service.
+grep -q 'rag-stack.rag-server.env.OIDC_ISSUER=\${_rag_browser_issuer}' "$SOURCE" \
+  || fail "no-ingress RAG issuer is not browser-reachable"
+grep -q 'rag-stack.rag-server.env.OIDC_DISCOVERY_URL=\$(_internal_oidc_issuer)' "$SOURCE" \
+  || fail "no-ingress RAG discovery is not in-cluster"
+pass "no-ingress RAG uses split browser/server OIDC endpoints"
+
 # The default static AgentGateway path must not contact the CRD installers.
 awk '
   /^_install_agentgateway_crds\(\) \{/ { found=1 }
