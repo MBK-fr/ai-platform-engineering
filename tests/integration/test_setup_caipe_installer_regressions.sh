@@ -92,6 +92,17 @@ grep -q 'global.rag.ingestorOidc.clientSecretRef.name=rag-ingestor-secret' "$SOU
   || fail "RAG installer still uses ignored legacy webIngestor values"
 pass "RAG ingestor uses shared chart OIDC values and reachable MinIO image"
 
+# Ingress-mode UI auth intentionally redirects unauthenticated requests to
+# /login; that is a reachable UI, not a failed ingress probe. The localtest.me
+# hint must preserve the issuer's port 443 for OAuth callback compatibility.
+grep -q 'if \[\[ "\$_ui_code" =~ \^\[23\]\[0-9\]\[0-9\]\$ \]\]; then' "$SOURCE" \
+  || fail "ingress validation rejects the expected UI auth redirect"
+grep -q 'sudo ssh -N -L 443:127.0.0.1:443 <host>' "$SOURCE" \
+  || fail "remote localtest.me guidance does not forward the issuer port"
+! grep -q 'ssh -L 8443:127.0.0.1:443' "$SOURCE" \
+  || fail "remote localtest.me guidance advertises an OAuth-incompatible port"
+pass "ingress validation accepts auth redirects and documents compatible SSH forwarding"
+
 # The default static AgentGateway path must not contact the CRD installers.
 awk '
   /^_install_agentgateway_crds\(\) \{/ { found=1 }

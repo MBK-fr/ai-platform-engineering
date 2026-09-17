@@ -7172,7 +7172,10 @@ run_validation() {
   if $ENABLE_INGRESS && [[ -n "${CAIPE_DOMAIN:-}" ]]; then
     local _ui_code
     _ui_code=$(curl -sk -o /dev/null -w "%{http_code}" "${_ui_url}/" --max-time 10 2>/dev/null || echo "000")
-    if [[ "$_ui_code" =~ ^(200|301|302|405)$ ]]; then
+    # An unauthenticated UI request is expected to redirect to /login. Treat
+    # any successful or redirect response as reachability; the browser login
+    # flow is the next check and should not be reported as an ingress outage.
+    if [[ "$_ui_code" =~ ^[23][0-9][0-9]$ ]]; then
       print_result "$(date '+%H:%M:%S') ✓ CAIPE UI reachable via ingress (HTTP ${_ui_code})"
       pass=$((pass + 1))
     else
@@ -7912,7 +7915,7 @@ monitor_port_forwards() {
     echo ""
     echo -e "    ${DIM}Re-print these any time: ./$(basename "$0") creds${NC}"
     if [[ "$CAIPE_DOMAIN" == *.localtest.me ]]; then
-      echo -e "    ${DIM}${CAIPE_DOMAIN} resolves to 127.0.0.1 — on a remote host, tunnel 443 (ssh -L 8443:127.0.0.1:443 <host>) or re-run with --domain=<public-dns>.${NC}"
+      echo -e "    ${DIM}${CAIPE_DOMAIN} resolves to 127.0.0.1 — on a remote host, forward local HTTPS 443 (sudo ssh -N -L 443:127.0.0.1:443 <host>) or re-run with --domain=<public-dns>.${NC}"
     fi
   fi
 
