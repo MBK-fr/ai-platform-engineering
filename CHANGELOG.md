@@ -1,3 +1,53 @@
+## 1.1.1-dev.1 (2026-09-16)
+
+## 1.2.0-dev.7 (2026-09-16)
+
+### Fix
+
+- **service-accounts**: raise create scopes cap and batch large selections (#2751)
+
+## 1.2.0-dev.6 (2026-09-15)
+
+### Fix
+
+- **helm**: correct non-root defaults breaking milvus and keycloak init jobs (#2749)
+
+## 1.2.0-dev.5 (2026-09-15)
+
+## 1.2.0-rc.2 (2026-09-15)
+
+## 1.2.0-dev.4 (2026-09-15)
+
+### Fix
+
+- **rag**: update E2E specs for the redesigned Unlinked Access modal
+- **rag**: show live progress while applying a bulk scope add
+
+### Perf
+
+- **rag**: batch bulk scope adds into one request instead of N
+
+## 1.2.0-dev.3 (2026-09-14)
+
+### Fix
+
+- **ui**: enforce zero lint warnings (#2743)
+
+## 1.2.0-dev.2 (2026-09-14)
+
+### Feat
+
+- **rag**: bulk-add datasources from a collection in service account pickers
+
+### Fix
+
+- **deps**: resolve install warnings and security alerts (#2742)
+- **rag**: keep unlinked SA edit UX in sync, fix long scope-list usability
+
+## 1.2.0-dev.1 (2026-09-14)
+
+## 1.2.0-rc.1 (2026-09-14)
+
 ## 1.1.0 (2026-09-14)
 
 ## 1.1.0-dev.7 (2026-09-14)
@@ -87,8 +137,6 @@
 
 ## 1.0.1-dev.8 (2026-09-10)
 
-## 1.0.1-rc.3 (2026-09-10)
-
 ### Fix
 
 - **ui**: preserve agent colors in chat avatars (#2699)
@@ -121,8 +169,6 @@
 
 ## 1.0.1-dev.6 (2026-09-07)
 
-## 1.0.1-rc.2 (2026-09-07)
-
 ## 1.0.1-dev.5 (2026-09-07)
 
 ### Fix
@@ -152,8 +198,6 @@
 - **ci**: allow autonomous path detection on pull requests (#2653)
 
 ## 1.0.1-dev.1 (2026-09-04)
-
-## 1.0.1-rc.1 (2026-09-04)
 
 ## 1.0.0-dev.24 (2026-09-04)
 
@@ -190,8 +234,6 @@
 
 ## 1.0.0-dev.22 (2026-09-02)
 
-## 1.0.0-rc.7 (2026-09-02)
-
 ## 1.0.0-dev.21 (2026-09-02)
 
 ### Fix
@@ -217,8 +259,6 @@
 - Update README.md (#2542)
 
 ## 1.0.0-dev.18 (2026-09-01)
-
-## 1.0.0-rc.6 (2026-09-01)
 
 ## 1.0.0-dev.17 (2026-09-01)
 
@@ -252,8 +292,6 @@
 
 ## 1.0.0-dev.16 (2026-09-01)
 
-## 1.0.0-rc.5 (2026-09-01)
-
 ## 1.0.0-dev.15 (2026-09-01)
 
 ## 1.0.0-dev.14 (2026-08-31)
@@ -282,8 +320,6 @@
 
 ## 1.0.0-dev.13 (2026-08-28)
 
-## 1.0.0-rc.4 (2026-08-28)
-
 ## 1.0.0-dev.12 (2026-08-28)
 
 ### Refactor
@@ -309,8 +345,6 @@
 
 ## 1.0.0-dev.10 (2026-08-27)
 
-## 1.0.0-rc.3 (2026-08-27)
-
 ## 1.0.0-dev.9 (2026-08-26)
 
 ### Fix
@@ -318,8 +352,6 @@
 - **platform**: align RAG access and application controls (#2599)
 
 ## 1.0.0-dev.8 (2026-08-26)
-
-## 1.0.0-rc.2 (2026-08-26)
 
 ## 1.0.0-dev.7 (2026-08-26)
 
@@ -376,8 +408,6 @@
 - **ui**: retire legacy agent builder (#2443)
 
 ## 1.0.0-dev.1 (2026-08-24)
-
-## 1.0.0-rc.1 (2026-08-24)
 
 ### Fix
 
