@@ -6233,6 +6233,9 @@ caipe-ui:
     KEYCLOAK_URL: "http://caipe-keycloak:8080"
     KEYCLOAK_REALM: "caipe"
     KEYCLOAK_RESOURCE_SERVER_ID: "caipe-platform"
+    # Interactive access tokens use the shared platform resource-server
+    # audience; OIDC_CLIENT_ID remains the browser client identifier.
+    OIDC_ACCEPTED_AUDIENCES: "caipe-platform"
 RBACEOF
 
   if [[ -n "$UI_ENV_FILE" ]]; then
