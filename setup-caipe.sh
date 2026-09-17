@@ -6964,6 +6964,11 @@ DAEOF
     log "Scheduler enabled (scheduled runs + cron-runner + scheduler MCP)"
   fi
 
+  # The standard setup deploys Dynamic Agents, so enable the workflow-runner
+  # UI capability by default. The standalone caipe-ui chart keeps this flag
+  # opt-in, but it must be on for a full setup to expose workflow features.
+  helm_args+=(--set "caipe-ui.config.WORKFLOW_RUNNER_ENABLED=true")
+
   # Autonomous agents: cron / interval / webhook triggers via the admin-gated
   # /api/autonomous proxy. Reuses the caipe-platform client; MONGODB_URI +
   # WEBHOOK_SECRET come from the caipe-autonomous-agents Secret provisioned in
