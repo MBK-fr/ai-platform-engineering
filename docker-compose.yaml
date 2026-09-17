@@ -375,6 +375,9 @@ services:
       - OIDC_ISSUER=${OIDC_ISSUER:-}
       - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}
       - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-}
+      # Keycloak user tokens target the platform resource server, while the
+      # browser client uses caipe-ui. Keep both audiences valid for BFF OBO.
+      - OIDC_ACCEPTED_AUDIENCES=${OIDC_ACCEPTED_AUDIENCES:-caipe-platform}
       - OIDC_GROUP_CLAIM=${OIDC_GROUP_CLAIM:-}
       - OIDC_REQUIRED_GROUP=${OIDC_REQUIRED_GROUP:-}
       - OIDC_REQUIRED_ADMIN_GROUP=${OIDC_REQUIRED_ADMIN_GROUP:-}
