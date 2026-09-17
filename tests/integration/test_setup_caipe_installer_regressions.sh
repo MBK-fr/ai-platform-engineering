@@ -97,10 +97,10 @@ pass "RAG ingestor uses shared chart OIDC values and reachable MinIO image"
 # hint must preserve the issuer's port 443 for OAuth callback compatibility.
 grep -q 'if \[\[ "\$_ui_code" =~ \^\[23\]\[0-9\]\[0-9\]\$ \]\]; then' "$SOURCE" \
   || fail "ingress validation rejects the expected UI auth redirect"
-grep -q 'sudo ssh -N -L 443:127.0.0.1:443 <host>' "$SOURCE" \
+grep -q 'sudo ssh -N -L 443:<remote-private-ip>:443 <host>' "$SOURCE" \
   || fail "remote localtest.me guidance does not forward the issuer port"
-! grep -q 'ssh -L 8443:127.0.0.1:443' "$SOURCE" \
-  || fail "remote localtest.me guidance advertises an OAuth-incompatible port"
+! grep -q 'ssh -N -L 443:127.0.0.1:443' "$SOURCE" \
+  || fail "remote localtest.me guidance targets remote loopback instead of ingress"
 pass "ingress validation accepts auth redirects and documents compatible SSH forwarding"
 
 # The default static AgentGateway path must not contact the CRD installers.

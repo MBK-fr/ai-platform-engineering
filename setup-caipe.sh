@@ -7915,7 +7915,7 @@ monitor_port_forwards() {
     echo ""
     echo -e "    ${DIM}Re-print these any time: ./$(basename "$0") creds${NC}"
     if [[ "$CAIPE_DOMAIN" == *.localtest.me ]]; then
-      echo -e "    ${DIM}${CAIPE_DOMAIN} resolves to 127.0.0.1 — on a remote host, forward local HTTPS 443 (sudo ssh -N -L 443:127.0.0.1:443 <host>) or re-run with --domain=<public-dns>.${NC}"
+      echo -e "    ${DIM}${CAIPE_DOMAIN} resolves to 127.0.0.1 — on a remote host, forward local HTTPS 443 to the remote private ingress address (sudo ssh -N -L 443:<remote-private-ip>:443 <host>) or re-run with --domain=<public-dns>.${NC}"
     fi
   fi
 
