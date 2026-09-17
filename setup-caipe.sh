@@ -6533,6 +6533,9 @@ deploy_caipe() {
 
     helm_args+=(
       --set "tags.dynamic-agents=true"
+      # The UI hides Agents and Schedules unless this capability flag is set;
+      # deploying the dynamic-agents service alone is not sufficient.
+      --set "caipe-ui.config.DYNAMIC_AGENTS_ENABLED=true"
       --set "caipe-ui.config.DYNAMIC_AGENTS_URL=http://${da_svc}:8001"
       # Inject the shared LLM secret (ANTHROPIC_API_KEY / AWS_* / AZURE_*) so
       # dynamic-agents can call the LLM backend.

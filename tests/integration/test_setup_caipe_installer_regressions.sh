@@ -49,6 +49,8 @@ grep -q 'OIDC_DISCOVERY_URL: "$(_internal_oidc_issuer)"' "$SOURCE" \
   || fail "dynamic-agents OIDC discovery URL is not in-cluster"
 grep -q 'OIDC_ACCEPTED_AUDIENCES: "caipe-platform"' "$SOURCE" \
   || fail "UI does not accept the shared platform token audience"
+grep -q 'caipe-ui.config.DYNAMIC_AGENTS_ENABLED=true' "$SOURCE" \
+  || fail "dynamic-agents deployment does not enable the UI capability flag"
 grep -q 'if \[\[ -n "\${CAIPE_DOMAIN:-}" \]\] || ! \$ENABLE_INGRESS; then' "$SOURCE" \
   || fail "post-deploy Keycloak setup does not run for no-ingress installs"
 pass "no-ingress uses split browser/server OIDC endpoints"
