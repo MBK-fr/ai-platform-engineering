@@ -101,6 +101,9 @@ ENABLE_RBAC_RUNTIME="${ENABLE_RBAC_RUNTIME:-true}"
 # / ENABLE_AUTONOMOUS_AGENTS=false on a memory-constrained host.
 ENABLE_SCHEDULER="${ENABLE_SCHEDULER:-true}"
 ENABLE_AUTONOMOUS_AGENTS="${ENABLE_AUTONOMOUS_AGENTS:-true}"
+# Workflow-runner UI capability: enabled by default for the standard setup.
+# Set WORKFLOW_RUNNER_ENABLED=false to keep the optional UI hints hidden.
+WORKFLOW_RUNNER_ENABLED="${WORKFLOW_RUNNER_ENABLED:-true}"
 # Keycloak bootstrap admin password (master realm). The keycloak subchart
 # requires an explicit value — generated admin passwords are disabled because
 # Keycloak persists the bootstrap admin in its database. Resolved/persisted by
@@ -6964,10 +6967,16 @@ DAEOF
     log "Scheduler enabled (scheduled runs + cron-runner + scheduler MCP)"
   fi
 
-  # The standard setup deploys Dynamic Agents, so enable the workflow-runner
-  # UI capability by default. The standalone caipe-ui chart keeps this flag
-  # opt-in, but it must be on for a full setup to expose workflow features.
-  helm_args+=(--set "caipe-ui.config.WORKFLOW_RUNNER_ENABLED=true")
+  # The standard setup enables the workflow-runner UI capability by default.
+  # Preserve an explicit value from the environment or UI env file. The
+  # standalone caipe-ui chart keeps this flag opt-in.
+  local _workflow_runner_enabled="$WORKFLOW_RUNNER_ENABLED"
+  if [[ -n "$UI_ENV_FILE" && -f "$UI_ENV_FILE" ]]; then
+    local _workflow_runner_from_file
+    _workflow_runner_from_file=$(_env_get "$UI_ENV_FILE" WORKFLOW_RUNNER_ENABLED)
+    [[ -n "$_workflow_runner_from_file" ]] && _workflow_runner_enabled="$_workflow_runner_from_file"
+  fi
+  helm_args+=(--set "caipe-ui.config.WORKFLOW_RUNNER_ENABLED=${_workflow_runner_enabled}")
 
   # Autonomous agents: cron / interval / webhook triggers via the admin-gated
   # /api/autonomous proxy. Reuses the caipe-platform client; MONGODB_URI +

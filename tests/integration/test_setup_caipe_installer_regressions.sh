@@ -51,8 +51,10 @@ grep -q 'OIDC_ACCEPTED_AUDIENCES: "caipe-platform"' "$SOURCE" \
   || fail "UI does not accept the shared platform token audience"
 grep -q 'caipe-ui.config.DYNAMIC_AGENTS_ENABLED=true' "$SOURCE" \
   || fail "dynamic-agents deployment does not enable the UI capability flag"
-grep -q 'caipe-ui.config.WORKFLOW_RUNNER_ENABLED=true' "$SOURCE" \
-  || fail "standard setup does not enable the workflow runner UI capability"
+grep -q 'WORKFLOW_RUNNER_ENABLED="\${WORKFLOW_RUNNER_ENABLED:-true}"' "$SOURCE" \
+  || fail "workflow runner is not enabled by default"
+grep -q 'caipe-ui.config.WORKFLOW_RUNNER_ENABLED=\${_workflow_runner_enabled}' "$SOURCE" \
+  || fail "workflow runner UI flag is not wired from the setup default"
 grep -q 'if \[\[ -n "\${CAIPE_DOMAIN:-}" \]\] || ! \$ENABLE_INGRESS; then' "$SOURCE" \
   || fail "post-deploy Keycloak setup does not run for no-ingress installs"
 pass "no-ingress uses split browser/server OIDC endpoints"
