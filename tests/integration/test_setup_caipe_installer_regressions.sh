@@ -59,6 +59,19 @@ grep -q 'if \[\[ -n "\${CAIPE_DOMAIN:-}" \]\] || ! \$ENABLE_INGRESS; then' "$SOU
   || fail "post-deploy Keycloak setup does not run for no-ingress installs"
 pass "no-ingress uses split browser/server OIDC endpoints"
 
+# RAG MCP must use the authenticated AgentGateway path. Dynamic Agents must
+# forward the caller token, otherwise the gateway sends an empty bearer token
+# upstream and RAG returns HTTP 401.
+grep -q 'AGENT_GATEWAY_URL: "http://caipe-agentgateway:4000"' "$SOURCE" \
+  || fail "Dynamic Agents gateway URL is not seeded"
+grep -q 'USE_IMPERSONATION_TOKENS: "true"' "$SOURCE" \
+  || fail "caller-token forwarding is not enabled for gateway MCP"
+grep -q '_kb_endpoint="http://caipe-agentgateway:4000/mcp/knowledge-base"' "$SOURCE" \
+  || fail "Knowledge Base seed does not use the AgentGateway route"
+grep -q 'kind: "caller_token"' "$SOURCE" \
+  || fail "Knowledge Base seed has no caller-token credential source"
+pass "RAG Knowledge Base MCP uses authenticated AgentGateway routing"
+
 # The default static AgentGateway path must not contact the CRD installers.
 awk '
   /^_install_agentgateway_crds\(\) \{/ { found=1 }

@@ -6592,6 +6592,17 @@ dynamic-agents:
     # MongoDB-compatible URI baked in before post_deploy_patches.
     MONGODB_URI: "${_database_uri_value}"
 DAEOF
+    # AgentGateway is the authenticated MCP path for the bundled RBAC install.
+    # Keep the runtime and the seeded MCP rows aligned: without these settings
+    # Dynamic Agents probes the gateway without forwarding the caller token,
+    # and RAG responds with 401 even though its pod is healthy.
+    if $ENABLE_AGENTGATEWAY; then
+      cat >> "$_da_values_file" <<DAEOF
+    AGENT_GATEWAY_URL: "http://caipe-agentgateway:4000"
+    AGENT_GATEWAY_MCP_SERVER_IDS: "all"
+    USE_IMPERSONATION_TOKENS: "true"
+DAEOF
+    fi
     if [[ -n "$da_oidc_issuer" ]]; then
       local _da_cors_origin
       _da_cors_origin="$(_browser_ui_url)"
@@ -6751,16 +6762,31 @@ DAEOF
 DAEOF
     done
 
-    # Add knowledge-base MCP server when RAG is enabled
+    # Add knowledge-base MCP server when RAG is enabled. The bundled RBAC
+    # topology exposes RAG through AgentGateway so ext_authz and the RAG OIDC
+    # check both run; direct service URLs do not carry the caller token.
     if $ENABLE_RAG; then
+      local _kb_endpoint="http://rag-server.${CAIPE_NAMESPACE:-caipe}.svc.cluster.local:${RAG_SERVER_PORT}/mcp"
+      if $ENABLE_AGENTGATEWAY; then
+        _kb_endpoint="http://caipe-agentgateway:4000/mcp/knowledge-base"
+      fi
       cat >> "$_da_values_file" <<DAEOF
       - id: "knowledge-base"
         name: "Knowledge Base"
         description: "Knowledge Base RAG tools for document search and retrieval"
         transport: "http"
-        endpoint: "http://rag-server.${CAIPE_NAMESPACE:-caipe}.svc.cluster.local:${RAG_SERVER_PORT}/mcp"
+        endpoint: "${_kb_endpoint}"
         enabled: true
 DAEOF
+      if $ENABLE_AGENTGATEWAY; then
+        cat >> "$_da_values_file" <<DAEOF
+        credential_sources:
+          - kind: "caller_token"
+            name: "X-CAIPE-Provider-Token"
+            target: "header"
+            fallback_client_credentials: true
+DAEOF
+      fi
     fi
 
   helm_args+=(--values "$_da_values_file")
