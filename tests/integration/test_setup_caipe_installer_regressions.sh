@@ -80,6 +80,18 @@ grep -q 'rag-stack.rag-server.env.OIDC_DISCOVERY_URL=\$(_internal_oidc_issuer)' 
   || fail "no-ingress RAG discovery is not in-cluster"
 pass "no-ingress RAG uses split browser/server OIDC endpoints"
 
+# The released RAG chart consumes ingestor authentication from the shared
+# global.rag.ingestorOidc values. The old rag-server.webIngestor path is ignored.
+grep -q "rag-stack.milvus.minio.image.repository=quay.io/minio/minio" "$SOURCE" \
+  || fail "RAG MinIO image is not pinned to the reachable Quay repository"
+grep -q 'global.rag.ingestorOidc.issuer=\${RAG_INGESTOR_OIDC_ISSUER}' "$SOURCE" \
+  || fail "RAG ingestor issuer is not wired through shared chart OIDC values"
+grep -q 'global.rag.ingestorOidc.clientSecretRef.name=rag-ingestor-secret' "$SOURCE" \
+  || fail "RAG ingestor secret is not wired through shared chart OIDC values"
+! grep -q 'rag-stack.rag-server.webIngestor' "$SOURCE" \
+  || fail "RAG installer still uses ignored legacy webIngestor values"
+pass "RAG ingestor uses shared chart OIDC values and reachable MinIO image"
+
 # The default static AgentGateway path must not contact the CRD installers.
 awk '
   /^_install_agentgateway_crds\(\) \{/ { found=1 }

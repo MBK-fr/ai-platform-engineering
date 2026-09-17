@@ -6827,6 +6827,9 @@ DAEOF
       --set 'rag-stack.milvus.etcd.replicaCount=1'
       --set 'rag-stack.milvus.minio.mode=standalone'
       --set 'rag-stack.milvus.minio.replicas=1'
+      # The pinned Docker Hub release is no longer pullable; Quay hosts the
+      # same image and is reachable for first-time Kind installs.
+      --set 'rag-stack.milvus.minio.image.repository=quay.io/minio/minio'
       --set 'rag-stack.milvus.minio.persistence.size=10Gi'
       --set 'rag-stack.milvus.minio.resources.requests.memory=256Mi'
       --set 'rag-stack.rag-server.env.SKIP_INIT_TESTS=true'
@@ -6854,8 +6857,8 @@ DAEOF
       )
     fi
     # Pre-load ingestor secret state from an existing cluster secret so that
-    # re-runs (upgrade path) also get webIngestor.enabled=true without having
-    # to wait for post_deploy_patches to re-provision Keycloak credentials.
+    # re-runs (upgrade path) also wire the shared ingestor OIDC values without
+    # having to wait for post_deploy_patches to re-provision credentials.
     if [[ "${RAG_INGESTOR_SECRET_READY:-false}" != "true" ]] \
         && kubectl get secret rag-ingestor-secret -n caipe &>/dev/null 2>&1; then
       RAG_INGESTOR_OIDC_ISSUER=$(kubectl get secret rag-ingestor-secret -n caipe \
@@ -6865,20 +6868,22 @@ DAEOF
       [[ -n "$RAG_INGESTOR_OIDC_ISSUER" ]] && RAG_INGESTOR_SECRET_READY=true \
         && log "RAG web-ingestor: loaded existing rag-ingestor-secret from cluster"
     fi
-    # Wire Keycloak client credentials into both rag-server (token validation)
-    # and web-ingestor (token acquisition) when the secret was provisioned.
+    # Wire the shared Keycloak client-credentials identity into both rag-server
+    # (token validation) and rag-ingestor (token acquisition) when the secret
+    # was provisioned. The 1.1.1 chart consumes this from global.rag.ingestorOidc;
+    # the legacy rag-server.webIngestor.* values are ignored by that chart.
     if [[ "${RAG_INGESTOR_SECRET_READY:-false}" == "true" ]]; then
       helm_args+=(
-        --set 'rag-stack.rag-server.webIngestor.enabled=true'
-        --set 'rag-stack.rag-server.webIngestor.envFrom[0].secretRef.name=rag-ingestor-secret'
-        # Pass non-secret OIDC config directly as env so the rag-server auth manager
-        # can validate ingestor tokens even before the envFrom template fix ships.
-        --set "rag-stack.rag-server.env.INGESTOR_OIDC_ISSUER=${RAG_INGESTOR_OIDC_ISSUER}"
-        --set "rag-stack.rag-server.env.INGESTOR_OIDC_CLIENT_ID=${RAG_INGESTOR_OIDC_CLIENT_ID}"
+        --set "global.rag.ingestorOidc.issuer=${RAG_INGESTOR_OIDC_ISSUER}"
+        --set "global.rag.ingestorOidc.discoveryUrl=$(_internal_oidc_issuer)/.well-known/openid-configuration"
+        --set "global.rag.ingestorOidc.jwksUrl=$(_internal_oidc_issuer)/protocol/openid-connect/certs"
+        --set "global.rag.ingestorOidc.clientId=${RAG_INGESTOR_OIDC_CLIENT_ID}"
+        --set 'global.rag.ingestorOidc.clientSecretRef.name=rag-ingestor-secret'
+        --set 'global.rag.ingestorOidc.clientSecretRef.key=INGESTOR_OIDC_CLIENT_SECRET'
       )
-      log "RAG web-ingestor: Keycloak OIDC credentials wired via rag-ingestor-secret"
+      log "RAG web-ingestor: shared Keycloak OIDC credentials wired via rag-ingestor-secret"
     else
-      helm_args+=(--set 'rag-stack.rag-server.webIngestor.enabled=false')
+      helm_args+=(--set 'rag-stack.rag-ingestors.enabled=false')
       log "RAG web-ingestor: disabled (no Keycloak credentials available)"
     fi
 
