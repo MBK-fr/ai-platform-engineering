@@ -1297,6 +1297,7 @@ services:
       - OPENFGA_HTTP=${OPENFGA_HTTP:-http://openfga:8080}
       - OPENFGA_STORE_NAME=${OPENFGA_STORE_NAME:-caipe-openfga}
       - CAIPE_UNSAFE_RBAC_BYPASS=${CAIPE_UNSAFE_RBAC_BYPASS:-false}
+      - AUDIT_SERVICE_URL=${AUDIT_SERVICE_URL:-http://audit-service:8010}
     restart: unless-stopped
     env_file: [.env]
     depends_on:
@@ -1751,7 +1752,7 @@ services:
       - deps
 
   milvus-minio:
-    image: minio/minio:RELEASE.2024-05-28T17-19-04Z
+    image: quay.io/minio/minio:RELEASE.2024-05-28T17-19-04Z
     container_name: milvus-minio
     environment:
       - MINIO_ACCESS_KEY=minioadmin
@@ -1880,7 +1881,7 @@ services:
       - tracing
 
   langfuse-minio:
-    image: minio/minio
+    image: quay.io/minio/minio
     container_name: langfuse-minio
     restart: always
     entrypoint: sh
