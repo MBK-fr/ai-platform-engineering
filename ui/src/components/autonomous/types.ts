@@ -216,13 +216,6 @@ export interface TaskRun {
   events?: Record<string, unknown>[];
 }
 
-export interface TaskRunFollowUpResult {
-  status: "accepted";
-  task_id: string;
-  run_id: string;
-  parent_run_id: string;
-}
-
 /**
  * Form-level shape used by `TaskFormDialog`. Distinct from
  * `AutonomousTask` because the form needs free-text inputs

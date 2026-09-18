@@ -67,6 +67,16 @@ export async function authorizeConversationWriteAccess(
       conversation,
       "write",
     );
+    if (conversation.source === "autonomous") {
+      return {
+        conversation,
+        denial: NextResponse.json({
+          success: false,
+          error: 'Automated history is read-only. Select "Continue this run" to open a manual follow-up chat.',
+          code: "autonomous_history_readonly",
+        }, { status: 409 }),
+      };
+    }
     return { conversation, denial: null };
   } catch (error) {
     return {

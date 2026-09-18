@@ -3,7 +3,9 @@ import type { ChatMessage, Conversation } from "@/types/a2a";
 import { ChatPanel } from "../DynamicAgentChatPanel";
 
 let mockConversation: Conversation;
-const mockFollowUpRun = jest.fn();
+const mockOpenChat = jest.fn();
+const mockPush = jest.fn();
+jest.mock("next/navigation", () => ({ useRouter: () => ({ push: mockPush }) }));
 const mockToast = jest.fn();
 const mockStreamMessage = jest.fn().mockResolvedValue(undefined);
 const mockChatState = {
@@ -31,8 +33,8 @@ jest.mock("@/components/ui/toast", () => ({ useToast: () => ({ toast: mockToast 
 jest.mock("@/lib/config", () => ({ getConfig: (key: string) => key === "appName" ? "Test agent" : false }));
 jest.mock("@/components/autonomous/api", () => ({
   autonomousApi: {
-    followUpRun: (...args: unknown[]) => mockFollowUpRun(...args),
-    listRuns: async () => [],
+    openFollowUpChat: (...args: unknown[]) => mockOpenChat(...args),
+    listFollowUpChats: async () => ({}),
   },
 }));
 jest.mock("@/lib/streaming", () => ({
@@ -73,49 +75,34 @@ beforeEach(() => {
     createdAt: new Date(),
     updatedAt: new Date(),
   } as Conversation;
-  mockFollowUpRun.mockResolvedValue({ run_id: "older-reply" });
+  mockOpenChat.mockResolvedValue({ conversation_id: "manual-chat" });
 });
 
-it("offers exact continuation only for the older run and keeps the normal composer", async () => {
+it("offers a separate follow-up for every run, including the latest, with no normal composer", async () => {
   render(<ChatPanel agentId="example-agent" conversationId="task-chat" />);
-  expect(screen.getAllByRole("button", { name: "Continue this run" })).toHaveLength(1);
-  expect(screen.getByPlaceholderText(/Ask anything/)).toBeEnabled();
-  fireEvent.click(screen.getByRole("button", { name: "Continue this run" }));
-  fireEvent.change(screen.getByPlaceholderText(/using only this run's context/), {
-    target: { value: "Explain the older result" },
-  });
-  fireEvent.click(screen.getByRole("button", { name: "Send follow-up" }));
-  await waitFor(() => expect(mockFollowUpRun).toHaveBeenCalledWith("example-task", "older", "Explain the older result"));
+  const buttons = screen.getAllByRole("button", { name: "Continue this run" });
+  expect(buttons).toHaveLength(2);
+  expect(screen.queryByPlaceholderText(/Ask anything/)).toBeNull();
+  fireEvent.click(buttons[1]);
+  await waitFor(() => expect(mockOpenChat).toHaveBeenCalledWith("example-task", "latest"));
+  expect(mockPush).toHaveBeenCalledWith("/chat/manual-chat");
+  expect(await screen.findByRole("link", { name: "Open manual follow-up" })).toHaveAttribute("href", "/chat/manual-chat");
+  expect(mockStreamMessage).not.toHaveBeenCalled();
 });
 
-it("sends a latest-run reply through the normal chat stream", async () => {
+it("keeps normal streaming available in the independent manual chat", async () => {
+  mockConversation = { ...mockConversation, source: "web", task_id: undefined, messages: [] };
   render(<ChatPanel agentId="example-agent" conversationId="task-chat" />);
-  fireEvent.change(screen.getByPlaceholderText(/Ask anything/), { target: { value: "Explain the latest result" } });
+  fireEvent.change(screen.getByPlaceholderText(/Ask anything/), { target: { value: "Explain this result" } });
   fireEvent.click(screen.getByTitle("Send message"));
   await waitFor(() => expect(mockStreamMessage).toHaveBeenCalledWith(
-    expect.objectContaining({ conversationId: "task-chat", message: "Explain the latest result" }),
+    expect.objectContaining({ conversationId: "task-chat", message: "Explain this result" }),
     expect.any(Object),
   ));
-  expect(mockFollowUpRun).not.toHaveBeenCalled();
+  expect(mockOpenChat).not.toHaveBeenCalled();
 });
 
-it("keeps the latest run button hidden after ordinary user follow-ups", () => {
-  mockConversation.messages.push(
-    { id: "typed-user", role: "user", content: "More details?", timestamp: new Date(), turnId: "typed" },
-    { id: "typed-answer", role: "assistant", content: "More details.", timestamp: new Date(), turnId: "typed" },
-  );
-  render(<ChatPanel agentId="example-agent" conversationId="task-chat" />);
-  expect(screen.getAllByRole("button", { name: "Continue this run" })).toHaveLength(1);
-});
-
-it("makes a previous run continuable when a newer run arrives", () => {
-  const { rerender } = render(<ChatPanel agentId="example-agent" conversationId="task-chat" />);
-  mockConversation = { ...mockConversation, messages: [...mockConversation.messages, ...runMessages("newest")] };
-  rerender(<ChatPanel agentId="example-agent" conversationId="task-chat" />);
-  expect(screen.getAllByRole("button", { name: "Continue this run" })).toHaveLength(2);
-});
-
-it("does not offer continuation in a read-only conversation", () => {
+it("does not offer continuation in a conversation shared as read-only", () => {
   render(<ChatPanel agentId="example-agent" conversationId="task-chat" readOnly readOnlyReason="shared_readonly" />);
   expect(screen.queryByRole("button", { name: "Continue this run" })).toBeNull();
   expect(screen.queryByPlaceholderText(/Ask anything/)).toBeNull();

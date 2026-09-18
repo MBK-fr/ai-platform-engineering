@@ -216,9 +216,22 @@ The Autonomous page polls active run history every five seconds.
   corresponding Chat thread when Chat publishing is enabled.
 - Webhook runs have a grouped task history under **Autonomous Runs → Webhook
   Runs** in the Chat sidebar; they are not published as ordinary conversations.
-- For cron, interval, and webhook tasks, use the bottom chat input to reply to
-  the latest run. **Continue this run** appears only on older runs and replies
-  in the selected run's context. Each new task execution starts fresh context.
+- Cron, interval, and webhook task histories are read-only. **Continue this
+  run** opens a private **[Manual Follow-up]** chat for any completed run,
+  including the latest. The original result retains a link to that chat.
+- The manual chat copies the selected run's saved checkpoint as of completion,
+  plus its available files, into a new execution context. Later replies cannot
+  change the automated context. Subsequent clicks reopen the existing chat.
+- Each caller has their own follow-up chat per run. Task ownership, Autonomous
+  eligibility, and agent-use permission are checked before creating it. Missing
+  snapshots and unfinished tool execution are rejected instead of starting with
+  an empty or shared context.
+
+The UI and Dynamic Agents services must both be updated for manual follow-up
+chats. Dynamic Agents reads the same task/run database as Autonomous Agents;
+`AUTONOMOUS_TASKS_COLLECTION` and `AUTONOMOUS_RUNS_COLLECTION` default to
+`autonomous_tasks` and `autonomous_runs`. Agents with a custom shared file
+namespace cannot branch into an isolated manual chat.
 
 `CHAT_HISTORY_PUBLISH_ENABLED` defaults to `false`. When enabled, cron and
 interval activity is published as one stable Chat conversation per task, with

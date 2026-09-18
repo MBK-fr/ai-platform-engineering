@@ -198,8 +198,9 @@ export function WebhookSetupStep({
 
       <div className="rounded-md border border-orange-500/30 bg-orange-500/10 px-3 py-2 text-xs text-foreground">
         Webhook deliveries appear under Chat → Autonomous Runs → Webhook Runs.
-        Each delivery keeps separate conversation context so repeated events do
-        not merge into one chat.
+        This is a read-only history with independent context for each run.
+        Select “Continue this run” on any result to open a separate manual
+        follow-up chat without changing the automated history.
       </div>
 
       <ProviderInstructions provider={provider} />

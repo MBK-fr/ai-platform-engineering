@@ -211,7 +211,7 @@ describe("Dynamic Agent chat Web UI backend routes", () => {
       { conversation_id: "visible-task-chat", agent_id: "agent-1" },
       mockProxyJSONRequest,
     ],
-  ])("continues the latest autonomous execution context for %s", async (
+  ])("rejects writes to the read-only autonomous history for %s", async (
     _name,
     handler,
     path,
@@ -231,9 +231,8 @@ describe("Dynamic Agent chat Web UI backend routes", () => {
 
     const response = await handler(jsonRequest(path, body));
 
-    expect(response.status).toBe(200);
-    const proxiedBody = JSON.parse(proxy.mock.calls[0][1] as string) as Record<string, unknown>;
-    expect(proxiedBody.conversation_id).toBe("isolated-run-context");
+    expect(response.status).toBe(409);
+    expect(proxy).not.toHaveBeenCalled();
     expect(mockRequireConversationResourcePermission).toHaveBeenCalledWith(
       expect.anything(),
       "alice@example.com",
@@ -242,7 +241,7 @@ describe("Dynamic Agent chat Web UI backend routes", () => {
     );
   });
 
-  it("recovers and caches the latest run context for an existing autonomous chat", async () => {
+  it("rejects writes to legacy autonomous chats without changing their context", async () => {
     const updateOne = jest.fn(async () => ({ acknowledged: true }));
     mockGetCollection.mockImplementation(async (name: string) => {
       if (name === "autonomous_runs") {
@@ -273,13 +272,9 @@ describe("Dynamic Agent chat Web UI backend routes", () => {
       }),
     );
 
-    expect(response.status).toBe(200);
-    const proxiedBody = JSON.parse(mockProxySSEStream.mock.calls[0][1] as string) as Record<string, unknown>;
-    expect(proxiedBody.conversation_id).toBe("legacy-run-context");
-    expect(updateOne).toHaveBeenCalledWith(
-      { _id: "visible-task-chat", source: "autonomous" },
-      { $set: { execution_context_id: "legacy-run-context" } },
-    );
+    expect(response.status).toBe(409);
+    expect(mockProxySSEStream).not.toHaveBeenCalled();
+    expect(updateOne).not.toHaveBeenCalled();
   });
 
   it("bypasses the conversation#write check for Slack conversations so any thread participant can invoke", async () => {

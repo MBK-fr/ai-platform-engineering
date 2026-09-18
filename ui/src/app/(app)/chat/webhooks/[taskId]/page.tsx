@@ -108,9 +108,9 @@ function WebhookTaskHistory() {
         </div>
 
         <div className="rounded-md border border-orange-500/30 bg-orange-500/10 px-3 py-2 text-sm text-foreground">
-          Each webhook delivery has its own conversation context. The chat input below
-          replies to the latest run. To follow up on an older run, expand it and choose
-          <span className="font-medium"> Continue this run</span>.
+          This chat contains automated runs and is read-only. Each webhook delivery has
+          its own conversation context. Select <span className="font-medium">Continue this run</span>
+          {" "}to discuss any result in a separate manual follow-up chat.
         </div>
 
         <RunHistory
