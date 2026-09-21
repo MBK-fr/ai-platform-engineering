@@ -77,6 +77,7 @@ export interface Conversation {
   client_type: ClientType; // Top-level: 'webui' | 'slack' (promoted from metadata)
   owner_id: string; // User email
   owner_subject?: string; // Keycloak subject for schema-versioned ownership checks
+  owner_canonical_subject?: string; // Resolved person identity for cross-surface statistics
   owner_identity_version?: number; // 2 when owner_subject has been normalized
   idempotency_key?: string; // Maps integration-specific identity (e.g. Slack thread_ts) to conversation_id used by UI/checkpoints
   participants: Participant[]; // Agents and users involved in this conversation
@@ -175,17 +176,22 @@ export interface Message {
     model?: string;
     latency_ms?: number;
     agent_name?: string;
+    agent_id?: string;
     is_final?: boolean;
     timeline_segments?: TimelineSegment[]; // Persisted for plan/thinking/answer reconstruction
     task_id?: string;
     turn_status?: string;
     is_interrupted?: boolean;
-    // Slack linking metadata — set on messages persisted by the Slack bot so
-    // stats/audit views can deep-link back to the source thread.
+    // Integration linking metadata supports scoped stats and source deep links.
     channel_id?: string;
     channel_name?: string;
     thread_ts?: string;
     slack_permalink?: string;
+    webex_space_id?: string;
+    webex_room_id?: string;
+    webex_thread_parent_id?: string;
+    webex_message_id?: string;
+    webex_is_direct?: boolean;
   };
   artifacts?: Artifact[];
   stream_events?: StoredStreamEvent[];
@@ -438,11 +444,16 @@ export interface AddMessageRequest {
     is_interrupted?: boolean;
     task_id?: string;
     timeline_segments?: TimelineSegment[]; // Plan/thinking/answer reconstruction
-    // Slack linking metadata (deep-link back to the source thread)
+    // Integration linking metadata (deep-link back to the source thread)
     channel_id?: string;
     channel_name?: string;
     thread_ts?: string;
     slack_permalink?: string;
+    webex_space_id?: string;
+    webex_room_id?: string;
+    webex_thread_parent_id?: string;
+    webex_message_id?: string;
+    webex_is_direct?: boolean;
   };
   artifacts?: Artifact[];
   stream_events?: StoredStreamEvent[];
