@@ -103,6 +103,11 @@ export interface Config {
    */
   workflowsEnabled: boolean;
   /**
+   * Whether the Projects surface is shown in application navigation.
+   * Set PROJECTS_ENABLED=true to enable.
+   */
+  projectsEnabled: boolean;
+  /**
    * Whether Dynamic Agents should be considered enabled by platform health.
    * Set DYNAMIC_AGENTS_ENABLED=true to enable.
    */
@@ -146,12 +151,16 @@ export interface Config {
   defaultFontSize: string;
   /** Default font family for new users: "inter" | "source-sans" | "ibm-plex" | "system" */
   defaultFontFamily: string;
-  /** Default color theme: "light" | "dark" | "midnight" | "nord" | "tokyo" | "cyberpunk" | "tron" | "matrix" */
+  /** Default color theme: "light" | "legacy-light" | "dark" | "midnight" | "nord" | "tokyo" | "cyberpunk" | "tron" | "matrix" */
   defaultTheme: string;
   /** Default gradient theme: "default" | "minimal" | "professional" | "ocean" | "sunset" | "cyberpunk" | "tron" | "matrix" */
   defaultGradientTheme: string;
   /** Dynamic Agents server URL for custom agent chat */
   dynamicAgentsUrl: string;
+  /** Whether autonomous task scheduling and webhook automation is enabled */
+  autonomousAgentsEnabled: boolean;
+  /** Whether the deployment-owned external Apps catalog is exposed */
+  agenticAppsEnabled: boolean;
   /** Optional default agent ID used to edit scheduled jobs */
   scheduleEditorAgentId: string | null;
   /** Whether the scheduled-agent workflow is enabled */
@@ -187,6 +196,11 @@ export interface Config {
    * When ticketEnabled is false, the dialog still opens but cannot create tickets.
    */
   reportProblemEnabled: boolean;
+  /**
+   * Whether the compact "Provide Feedback" shortcut is shown in the app header.
+   * Disabled by default. Set PROVIDE_FEEDBACK_ENABLED=true to enable it.
+   */
+  provideFeedbackEnabled: boolean;
   /** Derived: true if either Jira or GitHub ticket creation is enabled */
   ticketEnabled: boolean;
   /** Derived: which provider to use ('jira' takes precedence when both enabled) */
@@ -220,10 +234,9 @@ const DEFAULT_FONT_SIZE = 'medium';
 const DEFAULT_FONT_FAMILY = 'inter';
 const DEFAULT_THEME = 'dark';
 const DEFAULT_GRADIENT_THEME = 'default';
-
 const VALID_FONT_SIZES = ['small', 'medium', 'large', 'x-large'];
 const VALID_FONT_FAMILIES = ['inter', 'source-sans', 'ibm-plex', 'system'];
-const VALID_THEMES = ['light', 'dark', 'system', 'midnight', 'nord', 'tokyo', 'cyberpunk', 'tron', 'matrix'];
+const VALID_THEMES = ['light', 'legacy-light', 'dark', 'system', 'midnight', 'nord', 'tokyo', 'cyberpunk', 'tron', 'matrix'];
 const VALID_GRADIENT_THEMES = ['default', 'minimal', 'professional', 'ocean', 'sunset', 'cyberpunk', 'tron', 'matrix'];
 
 /** Default config used as client fallback before the layout script executes. */
@@ -256,6 +269,7 @@ const DEFAULT_CONFIG: Config = {
   sourceUrl: null,
   workflowRunnerEnabled: false,
   workflowsEnabled: false,
+  projectsEnabled: false,
   dynamicAgentsEnabled: false,
   feedbackEnabled: true,
   allowBuiltinSkillMutation: false,
@@ -267,11 +281,14 @@ const DEFAULT_CONFIG: Config = {
   defaultTheme: DEFAULT_THEME,
   defaultGradientTheme: DEFAULT_GRADIENT_THEME,
   dynamicAgentsUrl: 'http://localhost:8100',
+  autonomousAgentsEnabled: false,
+  agenticAppsEnabled: false,
   scheduleEditorAgentId: null,
   schedulerEnabled: false,
   schedulerAdminOnly: false,
   agentProtocol: 'agui',
   reportProblemEnabled: true,
+  provideFeedbackEnabled: false,
   jiraTicketEnabled: false,
   jiraBaseUrl: null,
   jiraTicketProject: null,
@@ -366,6 +383,7 @@ export function getServerConfig(): Config {
   const unsafeRbacBypassEnabled = enabledEnv('CAIPE_UNSAFE_RBAC_BYPASS');
   const workflowRunnerEnabled = env('WORKFLOW_RUNNER_ENABLED') === 'true';
   const workflowsEnabled = env('WORKFLOWS_ENABLED') === 'true';
+  const projectsEnabled = env('PROJECTS_ENABLED') === 'true';
   const dynamicAgentsEnabled = env('DYNAMIC_AGENTS_ENABLED') === 'true';
   const feedbackEnabled = env('FEEDBACK_ENABLED') !== 'false';
   // Default `false` (locked). Must mirror the server-side check in
@@ -398,6 +416,10 @@ export function getServerConfig(): Config {
       (process.env.IDENTITY_SYNC_OKTA_OAUTH_CLIENT_ID?.trim() &&
         process.env.IDENTITY_SYNC_OKTA_OAUTH_PRIVATE_KEY?.trim()))
   );
+  const autonomousAgentsFlag =
+    env('ENABLE_AUTONOMOUS_AGENTS') ?? env('AUTONOMOUS_AGENTS_ENABLED');
+  const autonomousAgentsEnabled = autonomousAgentsFlag === 'true';
+  const agenticAppsEnabled = env('AGENTIC_APPS_INSTALL_ENABLED') === 'true';
 
   const dynamicAgentsUrl = env('DYNAMIC_AGENTS_URL')
     || (isProduction ? 'http://dynamic-agents:8100' : 'http://localhost:8100');
@@ -406,6 +428,7 @@ export function getServerConfig(): Config {
   const agentProtocol: 'custom' | 'agui' = agentProtocolEnv === 'custom' ? 'custom' : 'agui';
 
   const reportProblemEnabled = env('REPORT_PROBLEM_ENABLED') !== 'false';
+  const provideFeedbackEnabled = env('PROVIDE_FEEDBACK_ENABLED') === 'true';
   const jiraBaseUrl = env('JIRA_BASE_URL') || null;
   const jiraEmail = env('JIRA_EMAIL') || null;
   const jiraToken = env('REPORT_PROBLEM_JIRA_TOKEN') || env('JIRA_TICKET_TOKEN') || null;
@@ -455,6 +478,7 @@ export function getServerConfig(): Config {
     sourceUrl: env('SOURCE_URL') || null,
     workflowRunnerEnabled,
     workflowsEnabled,
+    projectsEnabled,
     dynamicAgentsEnabled,
     feedbackEnabled,
     allowBuiltinSkillMutation,
@@ -466,11 +490,14 @@ export function getServerConfig(): Config {
     defaultTheme: validated(env('DEFAULT_THEME'), VALID_THEMES, DEFAULT_THEME),
     defaultGradientTheme: validated(env('DEFAULT_GRADIENT_THEME'), VALID_GRADIENT_THEMES, DEFAULT_GRADIENT_THEME),
     dynamicAgentsUrl,
+    autonomousAgentsEnabled,
+    agenticAppsEnabled,
     scheduleEditorAgentId: env('SCHEDULE_EDITOR_AGENT_ID') || null,
     schedulerEnabled: env('SCHEDULER_ENABLED') === 'true',
     schedulerAdminOnly: env('SCHEDULER_ADMIN_ONLY') === 'true',
     agentProtocol,
     reportProblemEnabled,
+    provideFeedbackEnabled,
     jiraTicketEnabled,
     jiraBaseUrl,
     jiraTicketProject,
