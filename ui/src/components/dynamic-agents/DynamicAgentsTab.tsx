@@ -44,8 +44,6 @@ const DEFAULT_ROW_PERMISSIONS = {
   can_manage: false,
   can_write: false,
   can_discover: false,
-  can_schedule: false,
-  can_automate: false,
 } as const;
 
 function agentCanEdit(agent: DynamicAgentConfigWithPermissions | null | undefined): boolean {
@@ -65,6 +63,7 @@ interface DynamicAgentsTabProps {
   selectedAgentId?: string | null;
   initialStep?: AgentSetupStep;
   onSelectedAgentChange?: (agentId: string | null) => void;
+  onSelectedAgentNameChange?: (agentName: string | null) => void;
   onStepChange?: (step: AgentSetupStep) => void;
 }
 
@@ -72,6 +71,7 @@ export function DynamicAgentsTab({
   selectedAgentId,
   initialStep,
   onSelectedAgentChange,
+  onSelectedAgentNameChange,
   onStepChange,
 }: DynamicAgentsTabProps = {}) {
   const router = useRouter();
@@ -132,7 +132,10 @@ export function DynamicAgentsTab({
   }, [fetchAgents]);
 
   React.useEffect(() => {
-    if (selectedAgentId === undefined) return;
+    if (selectedAgentId === undefined) {
+      onSelectedAgentNameChange?.(null);
+      return;
+    }
 
     const requestId = ++selectionRequestRef.current;
     if (!selectedAgentId) {
@@ -140,6 +143,7 @@ export function DynamicAgentsTab({
       setEditingAgent(null);
       setSelectionError(null);
       setSelectionLoading(false);
+      onSelectedAgentNameChange?.(null);
       return;
     }
 
@@ -151,6 +155,7 @@ export function DynamicAgentsTab({
 
     setSelectionLoading(true);
     setSelectionError(null);
+    onSelectedAgentNameChange?.(null);
     void (async () => {
       try {
         const response = await fetch(
@@ -166,12 +171,14 @@ export function DynamicAgentsTab({
             ...data.data,
             permissions: data.data.permissions ?? DEFAULT_ROW_PERMISSIONS,
           });
+          onSelectedAgentNameChange?.(data.data.name ?? null);
         }
       } catch (err: unknown) {
         if (selectionRequestRef.current === requestId) {
           loadedSelectionIdRef.current = null;
           setEditingAgent(null);
           setSelectionError(errorMessage(err, "Failed to load agent"));
+          onSelectedAgentNameChange?.(null);
         }
       } finally {
         if (selectionRequestRef.current === requestId) {
@@ -179,7 +186,7 @@ export function DynamicAgentsTab({
         }
       }
     })();
-  }, [selectedAgentId]);
+  }, [onSelectedAgentNameChange, selectedAgentId]);
 
   // Debounce search input
   React.useEffect(() => {
@@ -321,6 +328,7 @@ export function DynamicAgentsTab({
     setSelectionError(null);
     setEditingAgent(agent);
     onSelectedAgentChange?.(agent._id);
+    onSelectedAgentNameChange?.(agent.name);
   };
 
   const closeAgentEditor = () => {
@@ -331,6 +339,7 @@ export function DynamicAgentsTab({
     setCloningAgent(null);
     setSelectionError(null);
     setSelectionLoading(false);
+    onSelectedAgentNameChange?.(null);
     onSelectedAgentChange?.(null);
   };
 

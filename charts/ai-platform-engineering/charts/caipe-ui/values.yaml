@@ -21,7 +21,7 @@ serviceAccount:
   # Specifies whether a service account should be created
   create: true
   # Automatically mount a ServiceAccount's API credentials?
-  automount: true
+  automount: false
   # Annotations to add to the service account
   annotations: {}
   # The name of the service account to use.
@@ -250,7 +250,6 @@ config:
   WEBEX_BOT_ADMIN_AUDIENCE: "caipe-webex-bot-admin"
   # WEBEX_BOT_ADMIN_TOKEN_URL: "http://keycloak:7080/realms/caipe/protocol/openid-connect/token"
   # WEBEX_BOT_ADMIN_SCOPE: "webex:routes:read webex:routes:reload webex:routes:sync"
-  # WEBEX_LINK_HMAC_SECRET is sensitive and must come from existingSecret/externalSecrets.
   # Self-service Webex identity linking (Settings > Account & access) — a
   # separate Webex OAuth Integration from any WEBEX_CLIENT_ID connector app;
   # this one only reads the caller's Webex identity to link it to their
@@ -552,7 +551,7 @@ externalSecrets:
     #     key: dev/credential-oauth-connectors
     #     property: PAGERDUTY_SCOPES
 
-# Structured application config (models, MCP servers, agents).
+# Structured application config (models, MCP servers, agents, workflows, and RAG sources).
 # Rendered as a YAML file and volume-mounted into the container at /etc/caipe-ui/app-config.yaml.
 # Loaded at startup and marked as config_driven (cannot be edited via UI).
 # Auto-mounted only when at least one key below is non-empty.
@@ -607,10 +606,10 @@ appConfig:
   # Example:
   # - source_type: "slack_channel"
   #   channel_id: "C1234567890"
-  #   name: "eng-general"
-  #   description: "Engineering general channel"
-  #   owner_team: "team-example"          # optional management owner
-  #   search_with_teams: ["search-team"]  # optional, independent Search & Ingest access
+  #   name: "team-updates"
+  #   description: "Team updates channel"
+  #   owner_team: "primary"               # optional management owner
+  #   search_with_teams: ["secondary"]    # optional, independent Search access
   #   visibility: "global"                 # optional, defaults to "global" for config-driven sources
   #   default_chunk_size: 10000
   #   default_chunk_overlap: 2000
@@ -621,13 +620,13 @@ appConfig:
   # Workflow configurations (multi-step automated pipelines)
   workflow_configs: []
   # Example:
-  # - id: "my-workflow"
-  #   name: "My Workflow"
+  # - id: "example-workflow"
+  #   name: "Example Workflow"
   #   description: "A multi-step workflow"
   #   config_driven: true
   #   steps:
   #     - type: "step"
   #       display_text: "Step description"
-  #       agent_id: "mcp-sre"
+  #       agent_id: "example-agent"
   #       prompt: "Do something"
   #       on_error: "abort"

@@ -153,6 +153,15 @@ type SessionAuthSession = {
   isServiceAccount?: boolean;
   org?: string;
   principalType?: 'oidc_user' | 'service_account' | 'catalog_api_key' | 'skills_api_key';
+  /**
+   * Which literal auth path the request took, per getAuthFromBearerOrSession.
+   * NOT derivable from principalType: an OBO-exchanged Bearer token (Slack,
+   * Webex, external scripts) and a genuine browser session cookie both yield
+   * principalType 'oidc_user'. A real browser session NEVER sends an
+   * Authorization header for its own first-party requests, so 'bearer' here
+   * is a caller-authenticated-via-Bearer signal a caller cannot fake.
+   */
+  authMethod?: 'bearer' | 'session';
   role?: string;
   sub?: string;
   user?: {
@@ -490,11 +499,9 @@ function resolveLegacyWithAuthRbacPolicy(request: NextRequest): RouteRbacPolicy 
   // app/api/autonomous/[...path]/route.ts): any chat-capable user may manage
   // their OWN tasks — per-task ownership is enforced by the autonomous
   // service (`_assert_task_access`) and per-agent authorization by
-  // dynamic-agents/CAS (`can_use` / `can_schedule`). Without this mapping the
+  // dynamic-agents/CAS (`can_use` / organization `can_automate`). Without this mapping the
   // default below admin-gates every non-GET call, 403ing regular users before
-  // the request ever reaches the backend. The admin-only oversight surface
-  // (`/api/autonomous/oversight`) is unaffected — it does not use withAuth
-  // and enforces `admin_ui#view` itself.
+  // the request ever reaches the backend.
   if (pathname.startsWith('/api/autonomous')) {
     return { resource: 'chat', scope: 'invoke' };
   }
@@ -604,6 +611,7 @@ export async function getAuthFromBearerOrSession(
         canViewAdmin: false,
         sub: ownerSub,
         principalType: 'catalog_api_key',
+        authMethod: 'bearer',
         authScopes: ['catalog:read'],
       },
     };
@@ -647,6 +655,7 @@ export async function getAuthFromBearerOrSession(
           role: 'user',
           sub: localIdentity.sub,
           principalType: 'skills_api_key',
+          authMethod: 'bearer',
           authScopes: localIdentity.scopes,
         },
       };
@@ -679,6 +688,7 @@ export async function getAuthFromBearerOrSession(
       // `service_account:<sub>` rather than `user:<sub>`.
       isServiceAccount: identity.isServiceAccount === true,
       principalType: identity.isServiceAccount === true ? 'service_account' as const : 'oidc_user' as const,
+      authMethod: 'bearer' as const,
       user: { email: identity.email, name: identity.name },
     };
     if (process.env.NODE_ENV !== 'test') {
@@ -692,7 +702,7 @@ export async function getAuthFromBearerOrSession(
 
   // Path 2: Session cookie (existing NextAuth flow)
   const { user, session } = await getAuthenticatedUser(request, { allowAnonymous: !getConfig('ssoEnabled') });
-  return { user, session };
+  return { user, session: { ...session, authMethod: 'session' as const } };
 }
 
 export async function withRbacAuth<T>(

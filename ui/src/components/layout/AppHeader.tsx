@@ -46,6 +46,7 @@ const APPLICATION_SECTION_LABELS: Record<string,string> = {
   "agent-builder": "Agent Builder",
   admin: "Admin",
   autonomous: "Autonomous",
+  apps: "Apps",
   chat: "Chat",
   credentials: "Credentials",
   "dynamic-agents": "Agents",
@@ -189,7 +190,7 @@ export function AppHeader() {
                 : `Keycloak realm ${keycloakSummary.realm} unreachable`,
           count: 1,
           severity: "red" as const,
-          href: "/admin/security/keycloak",
+          href: "/admin/security/access-operations?operationsTab=keycloak",
         }
       : null;
   const adminOnlyAlerts: AdminAlertSource[] = isAdmin
@@ -201,7 +202,7 @@ export function AppHeader() {
               label: "Migrations required",
               count: migrationStatus.status.blocking_required_count ?? 0,
               severity: "red" as const,
-              href: "/admin/security/migrations",
+              href: "/admin/security/access-operations?operationsTab=migrations",
             }
           : null,
         keycloakHealth.summary?.invariants && keycloakHealth.summary.invariants.failing > 0
@@ -210,7 +211,7 @@ export function AppHeader() {
               label: `Keycloak invariant${keycloakHealth.summary.invariants.failing === 1 ? "" : "s"} failing`,
               count: keycloakHealth.summary.invariants.failing,
               severity: "amber" as const,
-              href: "/admin/security/keycloak",
+              href: "/admin/security/access-operations?operationsTab=keycloak",
             }
           : null,
         !migrationStatus.status?.is_blocking && migrationStatus.status?.needs_version_bootstrap
@@ -219,7 +220,7 @@ export function AppHeader() {
               label: "Version metadata needed",
               count: migrationStatus.status.version_bootstrap_required_count ?? 0,
               severity: "amber" as const,
-              href: "/admin/security/migrations",
+              href: "/admin/security/access-operations?operationsTab=migrations",
             }
           : null,
         !migrationStatus.status?.is_blocking && migrationStatus.status?.override_active
@@ -228,7 +229,7 @@ export function AppHeader() {
               label: "Migration override active",
               count: 1,
               severity: "amber" as const,
-              href: "/admin/security/migrations",
+              href: "/admin/security/access-operations?operationsTab=migrations",
             }
           : null,
       ].filter(Boolean) as AdminAlertSource[])

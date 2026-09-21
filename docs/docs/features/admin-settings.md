@@ -14,6 +14,20 @@ CAIPE separates configuration from platform operations:
 Open Settings from **Profile picture → Settings**. The Appearance shortcut in
 the application header opens the same workspace directly at Appearance.
 
+## Common tasks
+
+| Task | Where to go | Result |
+|---|---|---|
+| Choose your default agent | **Settings → Chat & agents** | New chats use your selected agent on the chosen surface |
+| Change the look and feel | **Settings → Appearance** | Update theme, typography, and accent styling |
+| Control personal alerts | **Settings → Notifications** | Hide or restore platform health messages for yourself |
+| Check whether services are available | **Settings → System health** | See the UI build and status of configured capabilities |
+| Manage a team or resource | **Admin** | Open the relevant people, resource, integration, or policy page |
+
+Settings changes affect your account unless the page explicitly says they are
+platform-wide. Admin changes can affect other users and are limited to people
+with the required administrative permissions.
+
 ## Settings map
 
 ### Personal
@@ -119,5 +133,5 @@ warning. Choose another agent or remove the platform default.
 ## Related pages
 
 - [UI customization and branding](../ui/customization.md)
-- [Custom agents](./custom-agents.md)
+- [Agent Builder](./agent-builder.md)
 - [RBAC architecture](../security/rbac/architecture.md)

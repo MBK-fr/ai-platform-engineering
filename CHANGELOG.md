@@ -1,3 +1,352 @@
+## 1.2.0-rc.3 (2026-09-18)
+
+### Feat
+
+- **jira**: support native ADF in comments and descriptions (#2766)
+
+### Fix
+
+- **ui**: resolve origin scheme mismatch in platform-health audit (#2752)
+- **ci**: allow manual prebuild dispatch for fork PRs
+- **ci**: package canary Helm charts under a valid SemVer placeholder (#2768)
+- **compose**: pull minio from quay.io, not Docker Hub (#2769)
+- **ci**: checkout the real PR head SHA in prebuild builds, not the merge ref
+- **ci**: replace dev auto-tag scheme with canary builds and versioned prebuild tags
+- **rag**: log shutdown-cancellation instead of a silent pass, match rag logger
+
+## 1.1.1-dev.2 (2026-09-17)
+
+### Feat
+
+- **rag**: audit RAG server OpenFGA decisions, grouping allows by subject
+
+### Fix
+
+- **ui**: load release notes from canonical repository (#2761)
+- **rag**: explain the expected CancelledError in stop_allow_rollup_flusher
+- **audit**: fail readiness immediately on shutdown, drop redundant global
+- **audit**: aggregate routine authorization allows into periodic counts
+
+## 1.1.1 (2026-09-16)
+
+## 1.1.1-dev.1 (2026-09-16)
+
+## 1.2.0-dev.7 (2026-09-16)
+
+### Fix
+
+- **service-accounts**: raise create scopes cap and batch large selections (#2751)
+
+## 1.2.0-dev.6 (2026-09-15)
+
+### Fix
+
+- **helm**: correct non-root defaults breaking milvus and keycloak init jobs (#2749)
+
+## 1.2.0-dev.5 (2026-09-15)
+
+## 1.2.0-rc.2 (2026-09-15)
+
+## 1.2.0-dev.4 (2026-09-15)
+
+### Fix
+
+- **rag**: update E2E specs for the redesigned Unlinked Access modal
+- **rag**: show live progress while applying a bulk scope add
+
+### Perf
+
+- **rag**: batch bulk scope adds into one request instead of N
+
+## 1.2.0-dev.3 (2026-09-14)
+
+### Fix
+
+- **ui**: enforce zero lint warnings (#2743)
+
+## 1.2.0-dev.2 (2026-09-14)
+
+### Feat
+
+- **rag**: bulk-add datasources from a collection in service account pickers
+
+### Fix
+
+- **deps**: resolve install warnings and security alerts (#2742)
+- **rag**: keep unlinked SA edit UX in sync, fix long scope-list usability
+
+## 1.2.0-dev.1 (2026-09-14)
+
+## 1.2.0-rc.1 (2026-09-14)
+
+## 1.1.0 (2026-09-14)
+
+## 1.1.0-dev.7 (2026-09-14)
+
+### Fix
+
+- **helm**: harden workload defaults (#2469)
+- **ui**: prevent recursive stream timeline updates (#2719)
+
+## 1.1.0-dev.5 (2026-09-14)
+
+### Feat
+
+- **runtime**: upgrade to Python 3.14 (#2722)
+
+## 1.1.0-dev.4 (2026-09-14)
+
+### Refactor
+
+- **slack-bot**: make app.py a thin composition root (#2596)
+
+## 1.1.0-dev.3 (2026-09-14)
+
+### Feat
+
+- **setup-caipe**: enable scheduler + autonomous agents by default (#2681)
+- **setup-caipe**: onboard extra LiteLLM models from a file + scan subcommand (#2682)
+
+### Fix
+
+- **setup-caipe**: configure rag-server ingestor OIDC even without UI SSO (#2684)
+- **setup-caipe**: extend the ingress hostAlias to rag-server + web-ingestor (#2675)
+- **setup-caipe**: ask before running sudo (#2668)
+
+## 1.1.0-dev.2 (2026-09-14)
+
+## 1.1.0-dev.1 (2026-09-14)
+
+## 1.0.1-dev.12 (2026-09-14)
+
+### Feat
+
+- **persistence**: add opt-in DocumentDB support (#2418)
+- **rag**: move bulk permission editing to the Ingest page, self-service
+- **rag**: retire Platform RAG as a first-class collection
+
+### Fix
+
+- Update ADOPTERS.md
+- **ui**: remove unsafe AgentGateway repair action (#2696)
+- **agentic-apps**: preserve root mount trailing slash (#2656)
+- **ui**: include resource names in agent breadcrumbs (#2698)
+
+## 1.0.1-dev.10 (2026-09-10)
+
+### Feat
+
+- **rag**: allow adding any searchable datasource to a collection
+
+### Fix
+
+- **rag**: check data_source#can_read, not ingestion_source#can_read, for collection publishing
+- **rag**: stop treating collection membership as Search access in the UI
+- **ci**: remove retag-unchanged, always build fresh on tag push
+- **ci**: give paths-filter a real base ref on tag pushes
+- **ui**: fail closed on application routes (#2654)
+- **audit**: suppress no-op policy reconciliation events (#2720)
+
+### Refactor
+
+- **rag**: clean up leftover dead field and sequential await from the collections change
+- **ui**: consolidate security and account settings (#2721)
+
+## 1.0.1-dev.9 (2026-09-10)
+
+### Fix
+
+- **rag**: surface the login-wall hint for sitemap crawls and mixed failures
+- **rag**: explain why a webpage crawl found no content when it may be a login wall
+- **rag**: surface auth-walled page failures during webpage ingestion
+- **rag**: return 400 instead of 500 for non-public webpage URLs
+- **setup-caipe**: backfill dynamic-agents AUTHZ_SERVICE_URL for the 1.0.0 chart (#2679)
+
+## 1.0.1-dev.8 (2026-09-10)
+
+### Fix
+
+- **ui**: preserve agent colors in chat avatars (#2699)
+- **setup-caipe**: let caipe-ui trust the self-signed cert for OIDC login (#2677)
+- **setup-caipe**: set litellm drop_params so Ollama embeddings work (#2674)
+- **setup-caipe**: pin in-cluster Ollama to the real model in LiteLLM mode (#2673)
+- **identity-sync**: unarchive teams when their group regains membership
+- **docs**: resolve versioned agent builder links (#2704)
+
+## 1.0.1-dev.7 (2026-09-08)
+
+### Feat
+
+- **rag**: seed datasources from app config (#2701)
+- **homepage**: pair product tour with full demo (#2703)
+- **docs**: polish homepage and feature navigation (#2702)
+
+### Fix
+
+- **docs**: restore star history chart (#2643)
+- **workflows**: validate stale tool overrides before execution (#2692)
+- **setup-caipe**: default local domain to *.localtest.me not *.local.me (#2671)
+- **setup-caipe**: harden interactive input and Kind cluster selection (#2667)
+- **setup-caipe**: make Langfuse tracing non-fatal and pin the chart (#2665)
+- **setup-caipe**: use the caipe-io chart registry and validate versions (#2666)
+
+### Refactor
+
+- **setup-caipe**: drop cnoe-agent-utils attribution from user-facing text (#2669)
+
+## 1.0.1-dev.6 (2026-09-07)
+
+## 1.0.1-dev.5 (2026-09-07)
+
+### Fix
+
+- **agentic-apps**: support bounded large request bodies
+
+## 1.0.1-dev.4 (2026-09-06)
+
+### Feat
+
+- **projects**: add projects workspace skeleton (#2648)
+
+## 1.0.1-dev.3 (2026-09-06)
+
+### Feat
+
+- **projects**: add projects navigation (#2647)
+
+## 1.0.1-dev.2 (2026-09-06)
+
+### Feat
+
+- **projects**: add projects feature flag (#2646)
+
+### Fix
+
+- **ci**: allow autonomous path detection on pull requests (#2653)
+
+## 1.0.1-dev.1 (2026-09-04)
+
+## 1.0.0-dev.24 (2026-09-04)
+
+### Feat
+
+- **agentic-apps**: add Weather reference runtime
+- **ui**: add config-driven hosted application runtime
+- **scheduler**: min interval restriction
+- **autonomous**: remove redundent max retires and timeout
+- **autonomous**: webhook to be in a single chat with each run having "continue this run" button to chat on that particular run
+- **docs**: up to date autonomous agent docs
+- **autonomous**: add min run interval (configurable) and wehook should NOT appear in the chat
+- **ui**: autonomous and schedule chats in separate sections to history
+- **autonomous**: simply team access and separate admin control to a tab
+
+### Fix
+
+- **autonomous-agents**: address code quality review
+- **ui**: test
+- **autonomous**: webhook secret ffs
+- **autonomous**: add webhook limits and address security concerns
+- **autonomous**: better admin tab and remove task oversight
+- **autonomous**: secret should be secretly handled
+- **ui**: autonomous page scroll issue
+- **docs**: version historical internal links (#2641)
+
+## 1.0.0 (2026-09-03)
+
+## 1.0.0-dev.23 (2026-09-03)
+
+### Feat
+
+- add timezone support and userhub metadata
+
+## 1.0.0-dev.22 (2026-09-02)
+
+## 1.0.0-dev.21 (2026-09-02)
+
+### Fix
+
+- **rbac**: allow self-service read access to Webex bot picker
+
+## 1.0.0-dev.20 (2026-09-02)
+
+### Feat
+
+- **ui**: add re-upload modal for file datasources
+- **rag**: add file datasource re-upload endpoint
+
+### Fix
+
+- **rag**: preserve job history across file datasource re-uploads
+
+## 1.0.0-dev.19 (2026-09-02)
+
+### Fix
+
+- **ci**: use built-in token for Dependabot Grype scans (#2628)
+- Update README.md (#2542)
+
+## 1.0.0-dev.18 (2026-09-01)
+
+## 1.0.0-dev.17 (2026-09-01)
+
+### Feat
+
+- **ui**: add an API section to Insights Statistics
+- **ui**: add a Webex section to Insights Statistics, mirroring Slack
+
+### Fix
+
+- **ui**: force client_type to 'api' for non-first-party Bearer callers
+- **audit**: attach real identity to bridge authz-decision audit events
+- **webex**: stop agent-flash on pinned threads; exclude DMs from Top Spaces
+- **ui**: exclude Webex conversations from the default sidebar listing
+- **ui**: stop the picker chevron from shifting when a value is cleared
+- **ui**: stop wide line charts from stretching data points and text
+- **audit**: capture openfga_rebac events at standard verbosity
+- **audit**: return a clean error instead of a bare 500 on retention failures
+- **webex**: redirect to sign-in instead of a bare 401 on webex-link/start
+- **ui**: fix chart hover misalignment on wide line charts
+- **ui**: make DAU/MAU "Today"/"This Month" cards rolling windows
+- **ui**: show a Webex source option in the Insights stats picker
+- **webex**: tag Webex message turns with source "webex" for Insights
+- **ui**: clear the ?request= param after approving/rejecting it
+- **ui**: paginate the Default agents picker's accessible-agents fetch
+- **webex**: pin threads to their first-responding agent
+
+### Perf
+
+- **audit**: parallelize S3 list/fetch calls in the audit-service read path
+
+## 1.0.0-dev.16 (2026-09-01)
+
+## 1.0.0-dev.15 (2026-09-01)
+
+## 1.0.0-dev.14 (2026-08-31)
+
+### Feat
+
+- **ui**: add owner team editor to Webex configured space detail
+- **ui**: add Webex Advanced admin tab and harden Slack/Webex parity
+- **ui**: unify Webex/Slack DM default-agent settings
+- **rag**: show collection id in the collections detail pane
+- **rag**: filter search MCP tool by collection_id
+
+### Fix
+
+- **ui**: skip unused runtime-status fetch, filter malformed direct-user rows
+- **webex-bot**: silence linked users on disabled DMs, recognize legacy reply marker
+- **ui**: fix stale-response race and double-fetch in Webex 1:1 panel
+- **rbac**: revoke stale team grant and avoid duplicate Webex space mapping
+- **webex-bot**: stop nesting bold and italic in agent-reply footer
+- **rbac**: require bot_id on Webex team-space assignments
+- **ui**: use public origin for Webex link callback redirect
+
+### Perf
+
+- **ui**: paginate and search the 1:1 Messages admin tab
+
+## 1.0.0-dev.13 (2026-08-28)
+
 ## 1.0.0-dev.12 (2026-08-28)
 
 ### Refactor
@@ -23,8 +372,6 @@
 
 ## 1.0.0-dev.10 (2026-08-27)
 
-## 1.0.0-rc.3 (2026-08-27)
-
 ## 1.0.0-dev.9 (2026-08-26)
 
 ### Fix
@@ -32,8 +379,6 @@
 - **platform**: align RAG access and application controls (#2599)
 
 ## 1.0.0-dev.8 (2026-08-26)
-
-## 1.0.0-rc.2 (2026-08-26)
 
 ## 1.0.0-dev.7 (2026-08-26)
 
@@ -90,8 +435,6 @@
 - **ui**: retire legacy agent builder (#2443)
 
 ## 1.0.0-dev.1 (2026-08-24)
-
-## 1.0.0-rc.1 (2026-08-24)
 
 ### Fix
 

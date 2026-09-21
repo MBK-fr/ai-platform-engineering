@@ -100,35 +100,38 @@ export async function installMockedRbacApp(page: Page, options: MockedRbacOption
   const gates = { ...DEFAULT_ADMIN_GATES, ...(options.gates ?? {}) };
   const handlers = options.handlers ?? [];
 
-  // The mocked API session is not visible to the server-rendered app layout.
-  // Install a lightweight NextAuth JWT as well so production-mode SSR can
-  // pass the authentication boundary without contacting a real IdP or MongoDB.
-  if (process.env.NEXTAUTH_SECRET) {
+  // The application layout now verifies the session during SSR. Keep the
+  // browser API mock for client-side assertions, but also install a matching
+  // signed cookie so protected pages can render before those routes exist.
+  const secret = process.env.NEXTAUTH_SECRET;
+  if (secret) {
     const nowSeconds = Math.floor(Date.now() / 1000);
     const token = await encode({
-      secret: process.env.NEXTAUTH_SECRET,
+      secret,
       maxAge: 60 * 60,
       token: {
+        sub: `playwright-mocked-${session.role}`,
         name: session.user.name,
         email: session.user.email,
-        role: session.role,
-        isAuthorized: session.isAuthorized,
-        canViewAdmin: session.canViewAdmin,
-        canAccessDynamicAgents: session.canAccessDynamicAgents,
-        accessToken: session.accessToken,
+        accessToken: "playwright-access-token",
         expiresAt: nowSeconds + 60 * 60,
+        isAuthorized: true,
+        role: session.role,
+        canViewAdmin: session.canViewAdmin,
+        canAccessDynamicAgents: true,
+        org: process.env.CAIPE_ORG_KEY?.trim() || "caipe",
       },
     });
-    const baseUrl = process.env.CAIPE_UI_BASE_URL ?? "http://localhost:3000";
-    await page.context().addCookies([{
-      name: "next-auth.session-token",
-      value: token,
-      url: baseUrl,
-      httpOnly: true,
-      secure: new URL(baseUrl).protocol === "https:",
-      sameSite: "Lax",
-      expires: nowSeconds + 60 * 60,
-    }]);
+    await page.context().addCookies([
+      {
+        name: "next-auth.session-token",
+        value: token,
+        url: process.env.CAIPE_UI_BASE_URL ?? "http://localhost:3000",
+        httpOnly: true,
+        sameSite: "Lax",
+        expires: nowSeconds + 2 * 60 * 60,
+      },
+    ]);
   }
 
   await page.route("**/api/**", async (route) => {
