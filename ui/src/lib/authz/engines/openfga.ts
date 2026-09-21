@@ -134,9 +134,16 @@ function recordFailure(): void {
   }
 }
 
-/** Drop cached authorization decisions after relationship graph mutations. */
+/**
+ * Drop cached authorization decisions after relationship graph mutations —
+ * both the per-decision cache and the list-objects (reverse lookup) cache.
+ * This is the ONLY place that should ever clear either cache after a
+ * mutation; a caller reaching for `decisionCache.clear()` directly is
+ * exactly how the two caches drift out of sync with each other.
+ */
 export function invalidateDecisionCache(): void {
   decisionCache.clear();
+  listObjectsCache.clear();
 }
 
 /** Test-only reset of breaker + store-id state. */
@@ -395,12 +402,12 @@ export function createOpenFgaAdmin(): PolicyAdmin {
     async grant(intent: GrantIntent): Promise<void> {
       const storeId = await resolveStoreId();
       await fgaWrite(storeId, [grantTuple(intent)], []);
-      decisionCache.clear(); // the graph changed — drop cached decisions
+      invalidateDecisionCache(); // the graph changed — drop cached decisions
     },
     async revoke(intent: GrantIntent): Promise<void> {
       const storeId = await resolveStoreId();
       await fgaWrite(storeId, [], [grantTuple(intent)]);
-      decisionCache.clear();
+      invalidateDecisionCache();
     },
   };
 }

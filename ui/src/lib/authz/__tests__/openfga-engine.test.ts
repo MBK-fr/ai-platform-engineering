@@ -1,7 +1,14 @@
 /**
  * @jest-environment node
  */
-import { createOpenFgaAdmin, createOpenFgaEngine, describeFgaCheck, getEngineStats, __resetAdapterStateForTests } from "../engines/openfga";
+import {
+  createOpenFgaAdmin,
+  createOpenFgaEngine,
+  describeFgaCheck,
+  getEngineStats,
+  invalidateDecisionCache,
+  __resetAdapterStateForTests,
+} from "../engines/openfga";
 import type { AuthorizeRequest } from "../contract";
 
 const realFetch = global.fetch;
@@ -256,6 +263,69 @@ describe("OpenFGA engine adapter", () => {
       expect((await p2).reason).toBe("AUTHZ_UNAVAILABLE");
       release(checkResponse(true));
       expect((await p1).decision).toBe("ALLOW");
+    });
+  });
+
+  describe("cache invalidation after a mutation", () => {
+    function writeResponse(): Response {
+      return { ok: true, status: 200, json: async () => ({}) } as unknown as Response;
+    }
+    function listObjectsResponse(objects: string[]): Response {
+      return { ok: true, status: 200, json: async () => ({ objects }) } as unknown as Response;
+    }
+
+    it("invalidateDecisionCache clears both the per-decision cache and the list-objects cache", async () => {
+      fetchMock.mockResolvedValueOnce(checkResponse(true)).mockResolvedValueOnce(listObjectsResponse(["agent:a"]));
+      const engine = createOpenFgaEngine();
+      await engine.check(req);
+      await engine.listObjects({ type: "user", id: "alice" }, "discover", "agent");
+      expect(getEngineStats().cacheSize).toBe(2);
+
+      invalidateDecisionCache();
+
+      expect(getEngineStats().cacheSize).toBe(0);
+    });
+
+    it("a stale listObjects result is not served after a grant — the exact regression the cache split introduced", async () => {
+      // Before this cache existed, a grant/revoke cleared decisionCache
+      // immediately (see below); listObjectsCache must get the same
+      // treatment or a revoked/newly-granted catalog resource can be
+      // served stale for the read-cache TTL.
+      fetchMock.mockResolvedValueOnce(listObjectsResponse(["agent:a"]));
+      const engine = createOpenFgaEngine();
+      await engine.listObjects({ type: "user", id: "alice" }, "discover", "agent");
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      fetchMock.mockResolvedValueOnce(writeResponse());
+      await createOpenFgaAdmin().grant({
+        resource: { type: "agent", id: "b" },
+        grantee: { type: "user", id: "alice" },
+        capability: "use",
+      });
+
+      fetchMock.mockResolvedValueOnce(listObjectsResponse(["agent:a", "agent:b"]));
+      const second = await engine.listObjects({ type: "user", id: "alice" }, "discover", "agent");
+      // A cache hit here would silently return the pre-grant Set(["a"]).
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(second.ids).toEqual(new Set(["a", "b"]));
+    });
+
+    it("a stale listObjects result is not served after a revoke", async () => {
+      fetchMock.mockResolvedValueOnce(listObjectsResponse(["agent:a", "agent:b"]));
+      const engine = createOpenFgaEngine();
+      await engine.listObjects({ type: "user", id: "alice" }, "discover", "agent");
+
+      fetchMock.mockResolvedValueOnce(writeResponse());
+      await createOpenFgaAdmin().revoke({
+        resource: { type: "agent", id: "b" },
+        grantee: { type: "user", id: "alice" },
+        capability: "use",
+      });
+
+      fetchMock.mockResolvedValueOnce(listObjectsResponse(["agent:a"]));
+      const second = await engine.listObjects({ type: "user", id: "alice" }, "discover", "agent");
+      expect(second.ids).toEqual(new Set(["a"]));
+      expect(fetchMock).toHaveBeenCalledTimes(3);
     });
   });
 

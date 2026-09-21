@@ -639,18 +639,45 @@ unaffected either way**: both functions check the `organization#manage`
 org-admin bypass *before* reaching either `authorizeMany` or `listAccessible`,
 so admins always see the full catalog regardless of which one is used.
 
-**Not migrated (candidates identified, not converted):**
+**`listAccessible` self-selects the strategy — callers don't have to.**
+`filterResourcesByPermission` is shared by both true pre-pagination catalog
+scans (agents, MCP servers) *and* callers with an already-small candidate list
+(a single-id lookup by `?id=`, or a page already sliced before the filter
+runs, e.g. `llm-models`). A reverse expansion of the subject's whole accessible
+set is not guaranteed to be cheaper than a few direct checks — for a
+broadly-authorized subject it can cost more. Below
+`LIST_OBJECTS_MIN_CANDIDATES` (default 100 — the API's own hard cap on
+`page_size`, so every already-paginated or single-item caller stays under it
+by construction), `listAccessible` delegates to `authorizeMany`'s per-candidate
+batch instead of calling `listObjects` at all; only a candidate list larger
+than one page — an actual catalog scan — crosses the threshold. This is a
+runtime decision inside `listAccessible` itself, not something each call site
+has to opt into.
 
-- `resolveAgentListPermissions` / `resolveMcpServerListPermissions` — these
-  check a *page*, not the catalog (already bounded to ~20–50 ids by the
-  caller). A reverse lookup still costs one full graph expansion of the
-  subject's accessible set; for a broad-access subject that can be more
-  expensive than a handful of direct checks. Batching stays right-sized here.
+**Not migrated — never routed through `listAccessible`, structurally:**
+
+- `resolveAgentListPermissions` / `resolveMcpServerListPermissions` — call
+  `authorizeMany` directly, not through `filterResourcesByPermission`. Already
+  bounded to a page (~20–50 ids) by the caller; no reason to route them
+  through the threshold check at all.
 - `POST /api/authz/v1/decisions/batch` — an external caller supplies up to
   200 arbitrary ids per call (`MAX_IDS`). Unlike the catalog-scan case, there
   is no guarantee the accessible set is small relative to the candidate list,
   so the efficiency trade is unclear without production measurement. Left on
   `authorizeMany`.
+
+:::warning listObjectsCache must stay invalidated alongside decisionCache
+Both caches must be cleared together on every relationship-graph mutation, or
+a revoked catalog permission can be served stale (or a newly-granted one
+withheld) for up to the read-cache TTL — a real regression, not just a
+missed optimization, since `filterResourcesByPermission` used to reflect a
+grant/revoke immediately via `decisionCache`. `invalidateDecisionCache()` in
+`engines/openfga.ts` is the **only** place that should ever clear either
+cache; `grant`/`revoke` and `reconcile.ts`'s tuple-diff writes all route
+through it precisely so the two caches can't drift apart again. Reaching for
+`decisionCache.clear()` directly anywhere else is how this regression
+happened the first time.
+:::
 
 Counts live in process memory, so a restart can drop an unflushed window. That
 undercounts an allow metric and never loses a denial or a policy change. The

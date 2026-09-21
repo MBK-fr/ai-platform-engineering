@@ -93,22 +93,39 @@ export async function filterAccessible(
 export interface ListAccessibleResult {
   accessible: string[];
   /**
-   * "AUTHZ_UNAVAILABLE" when the PDP could not be reached — `accessible` is
-   * empty because the lookup failed, not because the subject has no access.
-   * Callers that need to distinguish those two cases (e.g. failing the
-   * request instead of rendering an empty list) must check this.
+   * "AUTHZ_UNAVAILABLE" when the PDP could not be reached. Below the
+   * reverse-lookup threshold, `accessible` still reflects whichever
+   * candidates independently resolved to ALLOW (matching plain
+   * per-candidate check semantics — one candidate's outage doesn't hide
+   * another's already-resolved allow). At/above the threshold, one
+   * list-objects call is all-or-nothing, so `accessible` is empty.
+   * Callers that need to distinguish "PDP down" from "no access" (e.g. to
+   * fail the request instead of rendering a possibly-partial list) must
+   * check this rather than only inspecting `accessible`.
    */
   reason: ReasonCode;
 }
 
 /**
- * Filters `candidateIds` to those the subject may access, asking the PDP for
- * the subject's whole accessible set of `resourceType` in ONE call rather
- * than checking each candidate — the reverse of `filterAccessible`'s
- * per-candidate batch.
+ * Below this many candidates, checking each one directly is cheap, and a
+ * full reverse expansion of the subject's WHOLE accessible set is not
+ * guaranteed to be cheaper — for a broadly-authorized subject it can cost
+ * more than a handful of direct checks. 100 is the API's own hard cap on
+ * page size (`getPaginationParams`), so every already-paginated or
+ * single-item caller stays on the per-candidate path unchanged; only an
+ * actual pre-pagination catalog scan (hundreds+ candidates) crosses it.
+ */
+const LIST_OBJECTS_MIN_CANDIDATES = Number(process.env.AUTHZ_LIST_OBJECTS_MIN_CANDIDATES ?? 100);
+
+/**
+ * Filters `candidateIds` to those the subject may access.
  *
- * Audited as one row (`CasListObjectsEvent`) — there is no per-candidate
- * decision to collapse, because none was made. Correct only where the
+ * Below `LIST_OBJECTS_MIN_CANDIDATES`, delegates to `authorizeMany`'s
+ * per-candidate batch (audited as its own `batch: true` row — unchanged
+ * behavior, unchanged cost). At/above it, asks the PDP for the subject's
+ * whole accessible set of `resourceType` in ONE call instead of checking
+ * each candidate (audited as one `CasListObjectsEvent` row) — the reverse
+ * of `filterAccessible`'s per-candidate batch, correct only where the
  * relation is a pure relationship-graph computation with no product-policy
  * preCheck: see `PolicyEngine.listObjects`.
  */
@@ -120,6 +137,14 @@ export async function listAccessible(
   ctx: DecisionContext = {},
 ): Promise<ListAccessibleResult> {
   if (candidateIds.length === 0) return { accessible: [], reason: "OK" };
+
+  if (candidateIds.length <= LIST_OBJECTS_MIN_CANDIDATES) {
+    const results = await authorizeMany(subject, action, resourceType, candidateIds, ctx);
+    const accessible = candidateIds.filter((id) => results.get(id)?.decision === "ALLOW");
+    const unavailable = Array.from(results.values()).some((result) => result.reason === "AUTHZ_UNAVAILABLE");
+    return { accessible, reason: unavailable ? "AUTHZ_UNAVAILABLE" : "OK" };
+  }
+
   const { ids: accessibleIds, reason } = await engine.listObjects(subject, action, resourceType);
   emitListObjectsDecisionAudit(subject, action, resourceType, candidateIds, accessibleIds, reason, ctx);
   if (reason === "AUTHZ_UNAVAILABLE") return { accessible: [], reason };
