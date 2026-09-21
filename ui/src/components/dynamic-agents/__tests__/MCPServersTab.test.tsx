@@ -2,8 +2,6 @@ import React from "react";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MCP_SERVERS_REFRESH_INTERVAL_MS, MCPServersTab } from "../MCPServersTab";
 
-// assisted-by Codex Codex-sonnet-4-6
-
 /** Opens the `Tool` AgentPicker, searches for `toolName`, and picks it. */
 async function selectTool(toolName: string): Promise<void> {
   fireEvent.click(await screen.findByLabelText("Tool"));
@@ -41,7 +39,7 @@ const agentGatewayRagServer = {
 
 const listCapabilities = { repair_agentgateway: true };
 
-describe("MCPServersTab AgentGateway repair", () => {
+describe("MCPServersTab", () => {
   let serverItems: Record<string, unknown>[];
 
   beforeEach(() => {
@@ -124,7 +122,7 @@ describe("MCPServersTab AgentGateway repair", () => {
     }) as unknown as typeof fetch;
   });
 
-  it("does not expose the global AgentGateway repair action", async () => {
+  it("does not expose the unsafe AgentGateway repair action", async () => {
     render(<MCPServersTab />);
 
     await screen.findByText("Jira");
@@ -231,9 +229,9 @@ describe("MCPServersTab AgentGateway repair", () => {
     await screen.findByText("Jira");
     fireEvent.click(screen.getByRole("button", { name: /test mcp tools for jira/i }));
 
-    await screen.findByLabelText("Tool");
-    fireEvent.change(screen.getByLabelText("Parameter value 1"), { target: { value: "5" } });
+    await selectTool("version");
     fireEvent.change(screen.getByPlaceholderText("parameter_name"), { target: { value: "limit" } });
+    fireEvent.change(await screen.findByLabelText("Value for limit"), { target: { value: "5" } });
     fireEvent.click(screen.getByRole("button", { name: /run tool/i }));
 
     await waitFor(() => {
@@ -368,7 +366,6 @@ describe("MCPServersTab AgentGateway repair", () => {
     render(<MCPServersTab />);
 
     await screen.findByText("Jira");
-    expect(screen.queryByRole("button", { name: /Repair AgentGateway/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Probe tools for Jira/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /test mcp tools for jira/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Delete Jira/i })).not.toBeInTheDocument();
@@ -382,11 +379,10 @@ describe("MCPServersTab AgentGateway repair", () => {
     expect(await screen.findByText("Add MCP Server")).toBeInTheDocument();
   });
 
-  it("shows permitted row actions without exposing global AgentGateway repair", async () => {
+  it("shows probe, test, and delete when list permissions allow them", async () => {
     render(<MCPServersTab />);
 
     await screen.findByText("Jira");
-    expect(screen.queryByRole("button", { name: /Repair AgentGateway/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Probe tools for Jira/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /test mcp tools for jira/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Delete Jira/i })).toBeInTheDocument();
@@ -410,11 +406,13 @@ describe("MCPServersTab AgentGateway repair", () => {
 
   it("loads a directly linked MCP server and reports when its editor closes", async () => {
     const onSelectedServerChange = jest.fn();
+    const onSelectedServerNameChange = jest.fn();
 
     render(
       <MCPServersTab
         selectedServerId="jira"
         onSelectedServerChange={onSelectedServerChange}
+        onSelectedServerNameChange={onSelectedServerNameChange}
       />,
     );
 
@@ -423,9 +421,11 @@ describe("MCPServersTab AgentGateway repair", () => {
       "/api/mcp-servers?id=jira",
       { cache: "no-store" },
     );
+    expect(onSelectedServerNameChange).toHaveBeenCalledWith("Jira");
 
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onSelectedServerChange).toHaveBeenCalledWith(null);
+    expect(onSelectedServerNameChange).toHaveBeenCalledWith(null);
   });
 
   it("keeps the selected row open when the page adds the server ID to the URL", async () => {
