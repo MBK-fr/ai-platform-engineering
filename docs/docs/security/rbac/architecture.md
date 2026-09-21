@@ -610,6 +610,48 @@ Bulk-evaluation denials are deliberately excluded from `topDenied` in
 `/api/admin/authz/stats`: a filter's `resource_ref` is the collection, so they
 would crowd out the per-resource denials that indicate an actual access problem.
 
+#### Reverse lookup: `listAccessible` vs. `authorizeMany`
+
+`authorizeMany` still checks every candidate — one PDP round-trip per id
+(bounded-parallel, so cheap for a small set), collapsed into a single audit
+row. For `filterResourcesByPermission`'s and `filterAccessibleWorkflowConfigs`'s
+own core use — filtering the **whole catalog** (agents, MCP servers, workflow
+configs) down to what one subject can see, before pagination — that meant
+OpenFGA load scaled with catalog size on every page load, not just audit
+volume: rendering the agents list checked every agent in the org, every time,
+regardless of how many the subject could actually see.
+
+`listAccessible` asks the PDP once for the subject's *whole* accessible set of
+a type (`PolicyEngine.listObjects`, OpenFGA's `list-objects`) and intersects it
+with the candidate list in memory — one PDP call regardless of catalog size.
+Audited as one row carrying `list_objects: true` (same `evaluated_count` /
+`allowed_count` / `denied_count` / `allowed_ids` shape as a `batch` row, so
+`/api/admin/authz/stats` reads both identically); `denied_reasons` is always a
+single `NO_CAPABILITY` (or `AUTHZ_UNAVAILABLE`) bucket, since a reverse lookup
+has no per-candidate reason to report.
+
+**Only correct where the relation is a pure relationship-graph computation** —
+no `condition`s, no contextual tuples the caller would need to pass, and no
+product-policy `preCheck` (see `PolicyEngine.listObjects`'s doc comment and
+`compose()`'s `listObjects` passthrough). Verified against `deploy/openfga/model.fga`
+for `agent`, `mcp_server`, and `task` before this was wired in. **Org admins are
+unaffected either way**: both functions check the `organization#manage`
+org-admin bypass *before* reaching either `authorizeMany` or `listAccessible`,
+so admins always see the full catalog regardless of which one is used.
+
+**Not migrated (candidates identified, not converted):**
+
+- `resolveAgentListPermissions` / `resolveMcpServerListPermissions` — these
+  check a *page*, not the catalog (already bounded to ~20–50 ids by the
+  caller). A reverse lookup still costs one full graph expansion of the
+  subject's accessible set; for a broad-access subject that can be more
+  expensive than a handful of direct checks. Batching stays right-sized here.
+- `POST /api/authz/v1/decisions/batch` — an external caller supplies up to
+  200 arbitrary ids per call (`MAX_IDS`). Unlike the catalog-scan case, there
+  is no guarantee the accessible set is small relative to the candidate list,
+  so the efficiency trade is unclear without production measurement. Left on
+  `authorizeMany`.
+
 Counts live in process memory, so a restart can drop an unflushed window. That
 undercounts an allow metric and never loses a denial or a policy change. The
 bridge flushes on `SIGTERM` to narrow the gap.

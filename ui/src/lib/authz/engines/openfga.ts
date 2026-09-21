@@ -149,6 +149,7 @@ export function __resetAdapterStateForTests(): void {
   cacheHits = 0;
   cacheMisses = 0;
   decisionCache.clear();
+  listObjectsCache.clear();
 }
 
 // ─── Decision cache ───────────────────────────────────────────────────────────

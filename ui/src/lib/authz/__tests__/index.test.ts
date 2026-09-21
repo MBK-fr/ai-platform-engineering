@@ -8,15 +8,16 @@
 jest.mock("../engines/openfga", () => {
   const check = jest.fn();
   const batchCheck = jest.fn();
+  const listObjects = jest.fn();
   const grant = jest.fn();
   const revoke = jest.fn();
   return {
     __esModule: true,
-    createOpenFgaEngine: () => ({ check, batchCheck }),
+    createOpenFgaEngine: () => ({ check, batchCheck, listObjects }),
     createOpenFgaAdmin: () => ({ grant, revoke }),
     describeFgaCheck: jest.fn(),
     getEngineStats: jest.fn(() => ({ circuitState: "closed", cacheSize: 0, cacheHits: 0, cacheMisses: 0, cacheHitRatio: 0 })),
-    __mocks: { check, batchCheck, grant, revoke },
+    __mocks: { check, batchCheck, listObjects, grant, revoke },
   };
 });
 // Audit is a no-op in tests (Mongo unconfigured).
@@ -25,19 +26,23 @@ jest.mock("@/lib/mongodb", () => ({ getCollection: jest.fn(), isMongoDBConfigure
 const mockEmitGrantAudit = jest.fn();
 const mockEmitDecisionAudit = jest.fn();
 const mockEmitBatchDecisionAudit = jest.fn();
+const mockEmitListObjectsDecisionAudit = jest.fn();
 jest.mock("../audit", () => {
   const actual = jest.requireActual("../audit");
   return {
     ...actual,
     emitDecisionAudit: (...args: unknown[]) => mockEmitDecisionAudit(...args),
     emitBatchDecisionAudit: (...args: unknown[]) => mockEmitBatchDecisionAudit(...args),
+    emitListObjectsDecisionAudit: (...args: unknown[]) => mockEmitListObjectsDecisionAudit(...args),
     emitGrantAudit: (...args: unknown[]) => mockEmitGrantAudit(...args),
   };
 });
 
 import * as openfgaEngine from "../engines/openfga";
-const { check: mockCheck, batchCheck: mockBatch, grant: mockGrant, revoke: mockRevoke } = (
-  openfgaEngine as unknown as { __mocks: { check: jest.Mock; batchCheck: jest.Mock; grant: jest.Mock; revoke: jest.Mock } }
+const { check: mockCheck, batchCheck: mockBatch, listObjects: mockListObjects, grant: mockGrant, revoke: mockRevoke } = (
+  openfgaEngine as unknown as {
+    __mocks: { check: jest.Mock; batchCheck: jest.Mock; listObjects: jest.Mock; grant: jest.Mock; revoke: jest.Mock };
+  }
 ).__mocks;
 
 import {
@@ -45,6 +50,7 @@ import {
   authorizeMany,
   authorizeOrThrow,
   filterAccessible,
+  listAccessible,
   grant,
   revoke,
   AuthzDeniedError,
@@ -91,6 +97,64 @@ describe("filterAccessible", () => {
     const out = await filterAccessible({ type: "user", id: "u" }, "discover", "agent", []);
     expect(out).toEqual([]);
     expect(mockBatch).not.toHaveBeenCalled();
+  });
+});
+
+describe("listAccessible", () => {
+  beforeEach(() => {
+    mockListObjects.mockClear();
+    mockEmitListObjectsDecisionAudit.mockClear();
+  });
+
+  it("intersects the PDP's accessible set with the candidate ids — one PDP call regardless of candidate count", async () => {
+    mockListObjects.mockResolvedValue({ ids: new Set(["a", "c", "z"]), reason: "OK" });
+    const { accessible, reason } = await listAccessible(
+      { type: "user", id: "u" },
+      "discover",
+      "agent",
+      ["a", "b", "c"],
+    );
+    expect(reason).toBe("OK");
+    expect(accessible).toEqual(["a", "c"]);
+    expect(mockListObjects).toHaveBeenCalledTimes(1);
+    expect(mockListObjects).toHaveBeenCalledWith({ type: "user", id: "u" }, "discover", "agent");
+  });
+
+  it("fails closed (empty) and surfaces the reason when the PDP is unavailable", async () => {
+    mockListObjects.mockResolvedValue({ ids: new Set(["a", "b", "c"]), reason: "AUTHZ_UNAVAILABLE" });
+    const { accessible, reason } = await listAccessible(
+      { type: "user", id: "u" },
+      "discover",
+      "agent",
+      ["a", "b", "c"],
+    );
+    expect(reason).toBe("AUTHZ_UNAVAILABLE");
+    // Empty even though the (irrelevant, stale) ids Set is non-empty — the
+    // caller must not read a PDP outage as "these are accessible".
+    expect(accessible).toEqual([]);
+  });
+
+  it("short-circuits an empty candidate list without calling the engine", async () => {
+    const { accessible, reason } = await listAccessible({ type: "user", id: "u" }, "discover", "agent", []);
+    expect(accessible).toEqual([]);
+    expect(reason).toBe("OK");
+    expect(mockListObjects).not.toHaveBeenCalled();
+    expect(mockEmitListObjectsDecisionAudit).not.toHaveBeenCalled();
+  });
+
+  it("audits the lookup exactly once, passing the raw accessible set and candidate list through", async () => {
+    mockListObjects.mockResolvedValue({ ids: new Set(["a"]), reason: "OK" });
+    await listAccessible({ type: "user", id: "u" }, "discover", "agent", ["a", "b"]);
+    expect(mockEmitListObjectsDecisionAudit).toHaveBeenCalledTimes(1);
+    expect(mockEmitListObjectsDecisionAudit).toHaveBeenCalledWith(
+      { type: "user", id: "u" },
+      "discover",
+      "agent",
+      ["a", "b"],
+      new Set(["a"]),
+      "OK",
+      {},
+    );
   });
 });
 

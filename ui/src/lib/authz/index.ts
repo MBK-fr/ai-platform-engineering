@@ -10,11 +10,12 @@ import type {
   AuthorizeResult,
   DecisionContext,
   GrantIntent,
+  ReasonCode,
   ResourceType,
   Subject,
 } from "./contract";
 import { compose } from "./compose";
-import { emitBatchDecisionAudit, emitDecisionAudit, emitGrantAudit } from "./audit";
+import { emitBatchDecisionAudit, emitDecisionAudit, emitGrantAudit, emitListObjectsDecisionAudit } from "./audit";
 import { createOpenFgaEngine, createOpenFgaAdmin } from "./engines/openfga";
 import { workflowDelegationPreCheck } from "./domains/workflow";
 
@@ -87,6 +88,42 @@ export async function filterAccessible(
   if (ids.length === 0) return [];
   const results = await authorizeMany(subject, action, resourceType, ids, ctx);
   return ids.filter((id) => results.get(id)?.decision === "ALLOW");
+}
+
+export interface ListAccessibleResult {
+  accessible: string[];
+  /**
+   * "AUTHZ_UNAVAILABLE" when the PDP could not be reached — `accessible` is
+   * empty because the lookup failed, not because the subject has no access.
+   * Callers that need to distinguish those two cases (e.g. failing the
+   * request instead of rendering an empty list) must check this.
+   */
+  reason: ReasonCode;
+}
+
+/**
+ * Filters `candidateIds` to those the subject may access, asking the PDP for
+ * the subject's whole accessible set of `resourceType` in ONE call rather
+ * than checking each candidate — the reverse of `filterAccessible`'s
+ * per-candidate batch.
+ *
+ * Audited as one row (`CasListObjectsEvent`) — there is no per-candidate
+ * decision to collapse, because none was made. Correct only where the
+ * relation is a pure relationship-graph computation with no product-policy
+ * preCheck: see `PolicyEngine.listObjects`.
+ */
+export async function listAccessible(
+  subject: Subject,
+  action: Action,
+  resourceType: ResourceType,
+  candidateIds: string[],
+  ctx: DecisionContext = {},
+): Promise<ListAccessibleResult> {
+  if (candidateIds.length === 0) return { accessible: [], reason: "OK" };
+  const { ids: accessibleIds, reason } = await engine.listObjects(subject, action, resourceType);
+  emitListObjectsDecisionAudit(subject, action, resourceType, candidateIds, accessibleIds, reason, ctx);
+  if (reason === "AUTHZ_UNAVAILABLE") return { accessible: [], reason };
+  return { accessible: candidateIds.filter((id) => accessibleIds.has(id)), reason };
 }
 
 // ─── Grant / Revoke (PAP) ─────────────────────────────────────────────────────

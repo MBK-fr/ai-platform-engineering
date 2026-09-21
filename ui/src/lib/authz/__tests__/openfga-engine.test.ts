@@ -114,6 +114,70 @@ describe("OpenFGA engine adapter", () => {
     expect(results.get("no")?.decision).toBe("DENY");
   });
 
+  it("listObjects returns the accessible set from one call, decoded from OpenFGA's type:id objects", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ objects: ["agent:a", "agent:b"] }),
+    } as unknown as Response);
+
+    const result = await createOpenFgaEngine().listObjects({ type: "user", id: "alice" }, "discover", "agent");
+
+    expect(result.reason).toBe("OK");
+    expect(result.ids).toEqual(new Set(["a", "b"]));
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toContain("/list-objects");
+    expect(JSON.parse((init as RequestInit).body as string)).toMatchObject({
+      user: "user:alice",
+      relation: "can_discover",
+      type: "agent",
+    });
+  });
+
+  it("listObjects fails closed to AUTHZ_UNAVAILABLE (empty set, not 'no access') when OpenFGA errors", async () => {
+    fetchMock.mockRejectedValue(new Error("down"));
+    const result = await createOpenFgaEngine().listObjects({ type: "user", id: "alice" }, "discover", "agent");
+    expect(result.reason).toBe("AUTHZ_UNAVAILABLE");
+    expect(result.ids.size).toBe(0);
+  });
+
+  it("listObjects shares the circuit breaker with check — an open circuit short-circuits both", async () => {
+    fetchMock.mockRejectedValue(new Error("down"));
+    const engine = createOpenFgaEngine();
+    for (let i = 0; i < 5; i++) await engine.check(req); // trip the breaker
+    expect(fetchMock).toHaveBeenCalledTimes(5);
+
+    const result = await engine.listObjects({ type: "user", id: "alice" }, "discover", "agent");
+    expect(result.reason).toBe("AUTHZ_UNAVAILABLE");
+    expect(fetchMock).toHaveBeenCalledTimes(5); // short-circuited, no new fetch
+  });
+
+  it("listObjects caches a definitive result (second identical call hits no fetch)", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ objects: ["agent:a"] }),
+    } as unknown as Response);
+    const engine = createOpenFgaEngine();
+    await engine.listObjects({ type: "user", id: "alice" }, "discover", "agent");
+    await engine.listObjects({ type: "user", id: "alice" }, "discover", "agent");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("listObjects never caches an AUTHZ_UNAVAILABLE result (retries on next call)", async () => {
+    fetchMock.mockRejectedValueOnce(new Error("down")).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ objects: [] }),
+    } as unknown as Response);
+    const engine = createOpenFgaEngine();
+    const first = await engine.listObjects({ type: "user", id: "alice" }, "discover", "agent");
+    expect(first.reason).toBe("AUTHZ_UNAVAILABLE");
+    const second = await engine.listObjects({ type: "user", id: "alice" }, "discover", "agent");
+    expect(second.reason).toBe("OK");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("invalidates the cached store id and fails closed when a check returns 404", async () => {
     fetchMock.mockResolvedValue({ ok: false, status: 404, json: async () => ({}) } as unknown as Response);
     const r = await createOpenFgaEngine().check(req);
