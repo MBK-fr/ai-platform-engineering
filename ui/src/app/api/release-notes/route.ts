@@ -7,7 +7,7 @@ import { PLATFORM_CONFIG_ID } from "@/lib/platform-default-agent";
 
 export const dynamic = "force-dynamic";
 
-const GITHUB_OWNER = "cnoe-io";
+const GITHUB_OWNER = "caipe-io";
 const GITHUB_REPO = "ai-platform-engineering";
 const GITHUB_REF = "main";
 const RELEASES_DIR = "docs/releases";
