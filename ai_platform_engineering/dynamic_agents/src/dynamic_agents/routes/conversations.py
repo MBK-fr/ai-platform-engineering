@@ -103,7 +103,7 @@ async def get_interrupt_state(
     # 4. Get MCP servers for the agent and its subagents (needed to create runtime)
     mcp_servers = mongo.get_agent_mcp_servers(agent)
 
-    # 5. Create a non-cached Mongo-backed runtime to access the checkpointer.
+    # 5. Create a non-cached, read-only runtime to access the checkpointer.
     #
     # This is a read-only probe: it only needs the durable LangGraph
     # checkpoint to answer "is there a pending interrupt?". Routing it
@@ -113,13 +113,19 @@ async def get_interrupt_state(
     # transient connection error, or credentials not yet available in this
     # request's context — the next real chat call on the same conversation
     # reuses that degraded, cached runtime instead of getting a fresh one.
-    # A persistent one-shot runtime still reads the same checkpoint but is
-    # cleaned up immediately after this request and can never be reused by
-    # a later chat call.
+    #
+    # `cache.reader()` (not `cache.persistent()`) is required here: a normal
+    # runtime's initialize() clears and reseeds the shared GridFS skill-file
+    # namespace for StoreBackend agents, which is keyed by
+    # (agent_id, session_id, "filesystem") — the same namespace a real,
+    # healthy cached chat runtime for this conversation already uses. A
+    # `persistent()` runtime would delete those live skill files as a side
+    # effect of this probe and only reseed them on success; `reader()` skips
+    # that write entirely while still reading the same durable checkpoint.
     cache = get_runtime_cache()
     cache.set_mongo_service(mongo)
 
-    async with cache.persistent(
+    async with cache.reader(
         agent,
         mcp_servers,
         conversation_id,

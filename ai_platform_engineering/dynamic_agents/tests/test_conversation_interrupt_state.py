@@ -42,7 +42,7 @@ async def test_interrupt_state_uses_non_cached_runtime() -> None:
 
     cache = MagicMock()
     cache.get_or_create = AsyncMock()
-    cache.persistent.return_value = _AsyncRuntimeContext(runtime)
+    cache.reader.return_value = _AsyncRuntimeContext(runtime)
 
     with (
         patch(
@@ -62,7 +62,7 @@ async def test_interrupt_state_uses_non_cached_runtime() -> None:
         )
 
     assert response.has_pending_interrupt is False
-    cache.persistent.assert_called_once_with(
+    cache.reader.assert_called_once_with(
         agent,
         [],
         "conv-1",
