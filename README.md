@@ -16,7 +16,7 @@
 
 ### 💬 Slack
 
-* Not in CNCF Slack? [Join here first](https://slack.cncf.io)
+* Not in CNCF Slack? [Join here first](https://inviter.co/cncf)
 * [Join the CAIPE community channel](https://cloud-native.slack.com/archives/C08N0AKR52S)
 
 ## [Project Documentation](https://caipe.io/)
